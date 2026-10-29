@@ -1,0 +1,141 @@
+﻿:root {
+  color-scheme: light dark;
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+header,
+nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+header span {
+  flex: 1;
+  opacity: 0.7;
+}
+nav {
+  overflow: auto;
+}
+button,
+input {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border: 1px solid transparent;
+  padding: 7px;
+  cursor: pointer;
+  font: inherit;
+}
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+button:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button[aria-pressed='true'] {
+  border-color: var(--vscode-focusBorder);
+}
+input {
+  width: 100%;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(300px, 1fr) 230px;
+  flex: 1;
+  min-height: 0;
+}
+aside {
+  padding: 10px;
+  border-right: 1px solid var(--vscode-panel-border);
+  overflow: auto;
+}
+.inspector {
+  border-left: 1px solid var(--vscode-panel-border);
+  border-right: 0;
+  overflow-wrap: anywhere;
+}
+.inspector button,
+.files button,
+.learning button {
+  display: block;
+  margin: 6px 0;
+  text-align: left;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.files {
+  margin-top: 8px;
+}
+.files button {
+  width: 100%;
+  background: transparent;
+  color: var(--vscode-foreground);
+}
+.canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.state {
+  margin: auto;
+  padding: 20px;
+}
+.warning {
+  padding: 8px;
+  background: var(--vscode-inputValidation-warningBackground);
+  color: var(--vscode-inputValidation-warningForeground);
+  overflow: auto;
+  max-height: 160px;
+}
+.impact {
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 200px;
+  overflow: auto;
+}
+.impact small {
+  display: block;
+  width: 100%;
+}
+.learning {
+  overflow: auto;
+  padding: 18px;
+}
+.learning .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 800px) {
+  .layout {
+    grid-template-columns: 150px minmax(220px, 1fr);
+  }
+  .inspector {
+    grid-column: 1/-1;
+    max-height: 170px;
+    border-top: 1px solid var(--vscode-panel-border);
+  }
+}

@@ -1,5 +1,12 @@
 ﻿'use client';
-import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import { generateLearningPlan } from '@codedna/core/learning';
 import { ArchitectureMap, UIFlowMap } from '@codedna/graph-ui';
 import type { UIFlowAnalysis } from '@codedna/core';
 import { screenForFile } from '@/lib/explorer-session';
@@ -30,8 +37,15 @@ import type {
   AnalysisResult,
   RepositorySnapshot,
   SourceFile,
+  LearningPlan,
 } from '@codedna/shared';
 import { Brand } from './brand';
+import { ImpactWorkspace } from './impact-workspace';
+import {
+  LearningWorkspace,
+  emptyLearningProgress,
+  type LearningProgress,
+} from './learning-workspace';
 import { Badge, Button, Input, Panel, Tooltip } from './ui';
 
 type Mode = 'Architecture' | 'UI Flow' | 'Impact Analysis' | 'Learning Mode';
@@ -99,6 +113,13 @@ export function Workspace({
   uiSelectedId,
   onUISelection,
   frameworkDetected,
+  impactComplete,
+  onImpactInspect,
+  learningPlan,
+  learningProgress,
+  onLearningProgress,
+  onLearningInspect,
+  onLearningExplore,
 }: {
   state: WorkspaceState;
   mode: Mode;
@@ -108,6 +129,17 @@ export function Workspace({
   uiSelectedId: string | null;
   onUISelection: (id: string | null) => void;
   frameworkDetected: boolean;
+  impactComplete: boolean;
+  onImpactInspect: (id: string) => void;
+  learningPlan: LearningPlan;
+  learningProgress: LearningProgress;
+  onLearningProgress: (progress: LearningProgress) => void;
+  onLearningInspect: (file: string) => void;
+  onLearningExplore: (
+    mode: 'Architecture' | 'UI Flow' | 'Impact Analysis',
+    file?: string,
+    screenId?: string,
+  ) => void;
 }) {
   if (state.status === 'loading')
     return (
@@ -145,6 +177,26 @@ export function Workspace({
         graph={state.result.dependencyGraph}
         selectedId={selectedId}
         onSelectionChange={onSelectionChange}
+      />
+    );
+  if (mode === 'Learning Mode')
+    return (
+      <LearningWorkspace
+        plan={learningPlan}
+        progress={learningProgress}
+        onProgress={onLearningProgress}
+        onInspect={onLearningInspect}
+        onExplore={onLearningExplore}
+      />
+    );
+  if (mode === 'Impact Analysis')
+    return (
+      <ImpactWorkspace
+        {...(state.result ? { result: state.result } : {})}
+        uiFlow={uiFlow}
+        rootId={selectedId}
+        complete={impactComplete}
+        onInspect={onImpactInspect}
       />
     );
   if (mode === 'UI Flow')
@@ -250,10 +302,25 @@ export function Explorer({
   acquisitionDiagnostics: ExplorerSession['acquisitionDiagnostics'];
 }) {
   const [mode, setMode] = useState<Mode>('Architecture');
+  const [learningProgress, setLearningProgress] = useState<LearningProgress>(
+    emptyLearningProgress,
+  );
+  const learningPlan = useMemo(
+    () =>
+      generateLearningPlan(result, uiFlow.graph, {
+        snapshotComplete: completeness.complete,
+        uiFlowDiagnostics: uiFlow.diagnostics,
+      }),
+    [result, uiFlow, completeness.complete],
+  );
   const [left, setLeft] = useState(true);
   const [right, setRight] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uiSelectedId, setUISelectedId] = useState<string | null>(null);
+  const [impactInspection, setImpactInspection] = useState<{
+    root: string;
+    id: string;
+  } | null>(null);
   const [uiFilePath, setUIFilePath] = useState<string | null>(null);
   const [showScreenSource, setShowScreenSource] = useState(false);
   const selectedScreen = uiFlow.graph.nodes.find(
@@ -262,9 +329,11 @@ export function Explorer({
   const activePath =
     mode === 'UI Flow'
       ? (selectedScreen?.sourceFile ?? uiFilePath)
-      : selectedId?.startsWith('file:')
-        ? selectedId.slice(5)
-        : null;
+      : mode === 'Impact Analysis' && impactInspection?.root === selectedId
+        ? impactInspection.id.slice(5)
+        : selectedId?.startsWith('file:')
+          ? selectedId.slice(5)
+          : null;
   const selected =
     snapshot.files.find((file) => file.path === activePath) ?? null;
   const onUISelection = useCallback((id: string | null) => {
@@ -552,6 +621,20 @@ export function Explorer({
             uiSelectedId={uiSelectedId}
             onUISelection={onUISelection}
             frameworkDetected={frameworkDetected}
+            impactComplete={completeness.complete}
+            learningPlan={learningPlan}
+            learningProgress={learningProgress}
+            onLearningProgress={setLearningProgress}
+            onLearningInspect={(file) => onSelectionChange(`file:${file}`)}
+            onLearningExplore={(nextMode, file, screenId) => {
+              if (nextMode === 'UI Flow' && screenId) onUISelection(screenId);
+              else if (file) onSelectionChange(`file:${file}`);
+              setMode(nextMode);
+            }}
+            onImpactInspect={(id) => {
+              if (selectedId) setImpactInspection({ root: selectedId, id });
+              setRight(true);
+            }}
           />
           <div className="workspace-footer">
             <span>
@@ -561,7 +644,9 @@ export function Explorer({
             <span id="workspace-help">
               {mode === 'UI Flow'
                 ? 'Detected navigation is static evidence, not reachability.'
-                : 'Importer to dependency.'}
+                : mode === 'Impact Analysis'
+                  ? 'Arrows point from importer to dependency; impact follows them in reverse.'
+                  : 'Importer to dependency.'}
             </span>
           </div>
         </section>

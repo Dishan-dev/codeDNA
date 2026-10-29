@@ -22,6 +22,10 @@ export type {
   UIFlowFrameworkAdapter,
   UIFlowContext,
 } from './ui-flow/index.js';
+export { analyzeImpact, createImpactAnalyzer } from './impact.js';
+export { generateLearningPlan } from './learning.js';
+export type { LearningOptions } from './learning.js';
+export type { ImpactOptions, ImpactAnalyzer } from './impact.js';
 export { SnapshotValidationError } from './validation.js';
 export type { AnalysisOptions } from './validation.js';
 

@@ -63,11 +63,15 @@ export interface ArchitectureMapProps {
   graph: DependencyGraph;
   selectedId: string | null;
   onSelectionChange: (id: string | null) => void;
+  highlightedNodeIds?: readonly string[];
+  highlightedEdgeIds?: readonly string[];
 }
 function MapCanvas({
   graph,
   selectedId,
   onSelectionChange,
+  highlightedNodeIds,
+  highlightedEdgeIds,
 }: ArchitectureMapProps) {
   const adapted = useMemo(() => adaptGraph(graph), [graph]);
   const [laidOut, setLaidOut] = useState<AdaptedGraph | null>(null);
@@ -102,6 +106,14 @@ function MapCanvas({
     () => neighborhood(adapted.edges, selectedId),
     [adapted.edges, selectedId],
   );
+  const highlightedNodes = useMemo(
+    () => new Set(highlightedNodeIds ?? []),
+    [highlightedNodeIds],
+  );
+  const highlightedEdges = useMemo(
+    () => new Set(highlightedEdgeIds ?? []),
+    [highlightedEdgeIds],
+  );
   const nodes = useMemo(
     () =>
       (laidOut?.nodes ?? []).map((node) => ({
@@ -109,28 +121,38 @@ function MapCanvas({
         selected: node.id === selectedId,
         data: {
           ...node.data,
-          emphasis: !selectedId
-            ? ('normal' as const)
-            : node.id === selectedId
+          emphasis: highlightedNodeIds
+            ? node.id === selectedId
               ? ('selected' as const)
-              : adjacent.nodes.has(node.id)
+              : highlightedNodes.has(node.id)
                 ? ('connected' as const)
-                : ('dimmed' as const),
+                : ('dimmed' as const)
+            : !selectedId
+              ? ('normal' as const)
+              : node.id === selectedId
+                ? ('selected' as const)
+                : adjacent.nodes.has(node.id)
+                  ? ('connected' as const)
+                  : ('dimmed' as const),
         },
       })),
-    [laidOut, selectedId, adjacent],
+    [laidOut, selectedId, adjacent, highlightedNodeIds, highlightedNodes],
   );
   const edges = useMemo(
     () =>
       (laidOut?.edges ?? []).map((edge) => ({
         ...edge,
-        className: !selectedId
-          ? ''
-          : adjacent.edgeIds.has(edge.id)
+        className: highlightedEdgeIds
+          ? highlightedEdges.has(edge.id)
             ? 'dna-edge--active'
-            : 'dna-edge--dimmed',
+            : 'dna-edge--dimmed'
+          : !selectedId
+            ? ''
+            : adjacent.edgeIds.has(edge.id)
+              ? 'dna-edge--active'
+              : 'dna-edge--dimmed',
       })),
-    [laidOut, selectedId, adjacent],
+    [laidOut, selectedId, adjacent, highlightedEdgeIds, highlightedEdges],
   );
   useEffect(() => {
     if (!laidOut || !initialized.current) return;

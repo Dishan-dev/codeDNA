@@ -130,3 +130,91 @@ export interface AnalysisResult {
   dependencyGraph: DependencyGraph;
   uiFlowGraph: UIFlowGraph;
 }
+
+/** A path follows importer-to-dependency edges from an affected file to the changed file. */
+export interface DependencyPath {
+  id: StableId;
+  fileIds: StableId[];
+  edgeIds: StableId[];
+  evidence: Evidence[];
+  certainty: 'source-evidenced' | 'uncertain';
+}
+export interface ImpactedFile {
+  id: StableId;
+  path: string;
+  category: 'selected' | 'direct' | 'transitive';
+  distance: number;
+  paths: DependencyPath[];
+}
+export interface ImpactedScreen {
+  id: StableId;
+  screen: UIFlowNode;
+  sourceFile: string;
+  distance: number;
+  paths: DependencyPath[];
+  evidence: Evidence[];
+  attribution: 'source-file';
+}
+export interface ImpactDiagnostic {
+  id: StableId;
+  code: string;
+  message: string;
+  severity: 'info' | 'warning';
+  location?: SourceLocation;
+}
+export interface ImpactAnalysisResult {
+  schemaVersion: SchemaVersion;
+  selectedFilePath: string;
+  selectedFileId?: StableId;
+  files: ImpactedFile[];
+  screens: ImpactedScreen[];
+  dependencyGraph: DependencyGraph;
+  diagnostics: ImpactDiagnostic[];
+  summary: { direct: number; transitive: number; screens: number };
+  traversal: {
+    visitedFiles: number;
+    maxFiles: number;
+    maxDepth: number;
+    maxPathsPerFile: number;
+    truncated: boolean;
+    complete: boolean;
+  };
+}
+
+/** Learning plans contain only static evidence and clearly labeled heuristics. */
+export interface LearningQuestion {
+  id: StableId;
+  prompt: string;
+  choices: { id: StableId; label: string }[];
+  answerId: StableId;
+  explanation: string;
+  evidence: Evidence[];
+}
+export interface LearningStep {
+  id: StableId;
+  kind:
+    | 'overview'
+    | 'entry'
+    | 'dependency'
+    | 'module'
+    | 'navigation'
+    | 'impact'
+    | 'recap';
+  title: string;
+  explanation: string;
+  objective: string;
+  action: string;
+  complexity: 'introductory' | 'moderate' | 'advanced';
+  files: string[];
+  evidence: Evidence[];
+  dependencyEdgeIds?: StableId[];
+  navigationEdgeIds?: StableId[];
+  screenIds?: StableId[];
+  questions?: LearningQuestion[];
+}
+export interface LearningPlan {
+  schemaVersion: SchemaVersion;
+  snapshotId: StableId;
+  steps: LearningStep[];
+  warnings: string[];
+}

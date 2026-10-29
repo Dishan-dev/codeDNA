@@ -2,7 +2,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Explorer } from './explorer';
-import { SESSION_KEY, type ExplorerSession } from '@/lib/explorer-session';
+import {
+  SESSION_KEY,
+  learningSessionKey,
+  type ExplorerSession,
+} from '@/lib/explorer-session';
 export function ExplorerSessionLoader({
   source,
   sample,
@@ -57,7 +61,12 @@ export function ExplorerSessionLoader({
     );
   return (
     <Explorer
-      key={`${session.snapshot.id}:${session.source}`}
+      key={learningSessionKey(
+        session.source,
+        session.repositoryName,
+        session.snapshot.id,
+        session.snapshot.revision,
+      )}
       snapshot={session.snapshot}
       result={session.result}
       uiFlow={session.uiFlow}

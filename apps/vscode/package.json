@@ -1,6 +1,72 @@
 {
-  "name": "@codedna/vscode",
-  "version": "0.0.0",
+  "name": "codedna-vscode",
+  "version": "0.1.0",
   "private": true,
-  "description": "Placeholder for the future VS Code extension."
+  "description": "Explore local code architecture, UI flow, change impact and learning paths.",
+  "devDependencies": {
+    "@types/react": "19.0.10",
+    "@types/react-dom": "19.0.4",
+    "@types/vscode": "1.96.0",
+    "@vscode/vsce": "3.6.0",
+    "esbuild": "0.25.12"
+  },
+  "dependencies": {
+    "@codedna/core": "workspace:^",
+    "@codedna/graph-ui": "workspace:^",
+    "@codedna/shared": "workspace:^",
+    "minimatch": "10.2.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "displayName": "CodeDNA",
+  "publisher": "codedna",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onCommand:codedna.analyzeWorkspace",
+    "onCommand:codedna.openExplorer",
+    "onCommand:codedna.currentFileImpact",
+    "onCommand:codedna.refreshAnalysis"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "codedna.analyzeWorkspace",
+        "title": "CodeDNA: Analyze Workspace"
+      },
+      {
+        "command": "codedna.openExplorer",
+        "title": "CodeDNA: Open Explorer"
+      },
+      {
+        "command": "codedna.currentFileImpact",
+        "title": "CodeDNA: Analyze Current File Impact"
+      },
+      {
+        "command": "codedna.refreshAnalysis",
+        "title": "CodeDNA: Refresh Analysis"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "vscode:prepublish": "node build.mjs",
+    "package": "vsce package --no-dependencies --out codedna.vsix"
+  }
 }

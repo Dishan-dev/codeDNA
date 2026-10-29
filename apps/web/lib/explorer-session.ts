@@ -17,3 +17,13 @@ export function screenForFile(
   const matches = uiFlow.graph.nodes.filter((node) => node.sourceFile === path);
   return matches.length === 1 ? matches[0]!.id : null;
 }
+
+/** No progress is persisted; changing any identity component remounts the Explorer. */
+export function learningSessionKey(
+  source: string,
+  repository: string,
+  snapshotId: string,
+  revision?: string,
+): string {
+  return JSON.stringify([source, repository, snapshotId, revision ?? null]);
+}
