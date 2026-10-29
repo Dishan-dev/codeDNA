@@ -19,6 +19,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@codedna/shared": "workspace:*"
+    "@codedna/shared": "workspace:*",
+    "typescript": "5.8.2"
   }
 }
