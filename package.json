@@ -1,0 +1,25 @@
+{
+  "name": "codedna",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.13.10",
+    "eslint": "10.13.0",
+    "prettier": "3.5.3",
+    "turbo": "2.4.4",
+    "typescript": "5.8.2",
+    "typescript-eslint": "8.72.1",
+    "vitest": "3.0.8"
+  }
+}

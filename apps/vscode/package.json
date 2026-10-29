@@ -1,0 +1,6 @@
+{
+  "name": "@codedna/vscode",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Placeholder for the future VS Code extension."
+}

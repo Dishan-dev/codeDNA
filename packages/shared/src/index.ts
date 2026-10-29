@@ -1,0 +1,78 @@
+/** All schema identifiers are opaque and stable within a snapshot. */
+export type StableId = string;
+export type SchemaVersion = '1.0';
+
+/** Positions are 1-based; end is exclusive. Paths are repository-relative. */
+export interface SourceLocation {
+  path: string;
+  start: { line: number; column: number };
+  end: { line: number; column: number };
+}
+export interface Evidence {
+  description: string;
+  location?: SourceLocation;
+}
+/** Confidence is a number between 0 and 1, inclusive. */
+export interface AnalysisMetadata {
+  confidence: number;
+  evidence: Evidence[];
+}
+export interface SourceFile {
+  id: StableId;
+  path: string;
+  content: string;
+  language?: string;
+}
+export interface RepositorySnapshot {
+  schemaVersion: SchemaVersion;
+  id: StableId;
+  files: SourceFile[];
+  revision?: string;
+}
+export interface AnalysisDiagnostic {
+  id: StableId;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  location?: SourceLocation;
+}
+export interface DependencyNode {
+  id: StableId;
+  label: string;
+  location?: SourceLocation;
+  metadata: AnalysisMetadata;
+}
+export interface DependencyEdge {
+  id: StableId;
+  sourceId: StableId;
+  targetId: StableId;
+  metadata: AnalysisMetadata;
+}
+export interface DependencyGraph {
+  schemaVersion: SchemaVersion;
+  nodes: DependencyNode[];
+  edges: DependencyEdge[];
+}
+export interface UIFlowNode {
+  id: StableId;
+  label: string;
+  location?: SourceLocation;
+  metadata: AnalysisMetadata;
+}
+export interface UIFlowEdge {
+  id: StableId;
+  sourceId: StableId;
+  targetId: StableId;
+  metadata: AnalysisMetadata;
+}
+export interface UIFlowGraph {
+  schemaVersion: SchemaVersion;
+  nodes: UIFlowNode[];
+  edges: UIFlowEdge[];
+}
+export interface AnalysisResult {
+  schemaVersion: SchemaVersion;
+  snapshotId: StableId;
+  diagnostics: AnalysisDiagnostic[];
+  dependencyGraph: DependencyGraph;
+  uiFlowGraph: UIFlowGraph;
+}
