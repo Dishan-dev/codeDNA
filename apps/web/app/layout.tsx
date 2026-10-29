@@ -1,4 +1,4 @@
-// @ts-expect-error CSS is resolved by the Next.js bundler.
+import '@codedna/graph-ui/styles.css';
 import './globals.css';
 import type { ReactNode } from 'react';
 

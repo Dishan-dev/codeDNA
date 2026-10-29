@@ -5,15 +5,19 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "eslint app",
+    "lint": "eslint app components lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@codedna/core": "workspace:^",
+    "@codedna/graph-ui": "workspace:^",
+    "@codedna/shared": "workspace:^",
+    "clsx": "2.1.1",
+    "lucide-react": "^1.64.0",
     "next": "15.5.28",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "clsx": "2.1.1",
     "tailwind-merge": "3.3.1"
   },
   "devDependencies": {
