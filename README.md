@@ -1,6 +1,6 @@
 # CodeDNA
 
-CodeDNA is an open-source-first developer platform for understanding unfamiliar codebases. Phase 1 establishes a workspace; it does not analyze code yet.
+CodeDNA is an open-source-first developer platform for understanding unfamiliar codebases. The shared engine performs snapshot-based TypeScript and JavaScript file dependency analysis.
 
 ## Getting started
 

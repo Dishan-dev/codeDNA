@@ -33,11 +33,18 @@ export interface AnalysisDiagnostic {
   id: StableId;
   severity: 'info' | 'warning' | 'error';
   message: string;
+  code?: string;
   location?: SourceLocation;
 }
+export type DependencyKind =
+  | 'import'
+  | 're-export'
+  | 'dynamic-import'
+  | 'require';
 export interface DependencyNode {
   id: StableId;
   label: string;
+  kind?: 'file' | 'external';
   location?: SourceLocation;
   metadata: AnalysisMetadata;
 }
@@ -45,6 +52,9 @@ export interface DependencyEdge {
   id: StableId;
   sourceId: StableId;
   targetId: StableId;
+  kind?: DependencyKind;
+  specifier?: string;
+  location?: SourceLocation;
   metadata: AnalysisMetadata;
 }
 export interface DependencyGraph {

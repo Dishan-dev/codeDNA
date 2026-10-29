@@ -1,0 +1,275 @@
+.dna-map {
+  position: relative;
+  flex: 1;
+  min-height: 360px;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+.dna-map .react-flow {
+  background: transparent;
+}
+.dna-map .react-flow__node:focus-visible {
+  outline: 2px solid #9db4ff;
+  outline-offset: 5px;
+  border-radius: 9px;
+}
+.dna-node {
+  position: relative;
+  width: 220px;
+  height: 82px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  background: #151d2a;
+  border: 1px solid #3a4861;
+  border-radius: 9px;
+  color: #e7eefc;
+  box-shadow: 0 8px 25px #0006;
+  transition:
+    opacity 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.dna-node--external {
+  background: #172625;
+  border-color: #345d56;
+}
+.dna-node--selected {
+  border-color: #a7bcff;
+  box-shadow:
+    0 0 0 2px #809cff55,
+    0 8px 28px #0009;
+}
+.dna-node--connected {
+  border-color: #6c9fae;
+}
+.dna-node--dimmed {
+  opacity: 0.25;
+}
+.dna-node-icon {
+  flex: none;
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: #253655;
+  color: #a9bfff;
+  font: 600 11px monospace;
+}
+.dna-node--external .dna-node-icon {
+  background: #23443e;
+  color: #82dbc6;
+  font-size: 18px;
+}
+.dna-node-copy {
+  min-width: 0;
+  flex: 1;
+}
+.dna-node-copy strong,
+.dna-node-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dna-node-copy strong {
+  font-size: 12px;
+  line-height: 17px;
+}
+.dna-node-copy small {
+  font: 9px/16px monospace;
+  color: #8292a9;
+}
+.dna-node-type {
+  font: 9px monospace;
+  color: #9aadd0;
+  padding: 3px 4px;
+  border: 1px solid #364661;
+  border-radius: 3px;
+}
+.dna-node-counts {
+  position: absolute;
+  bottom: 10px;
+  left: 54px;
+  display: flex;
+  gap: 12px;
+  font: 9px monospace;
+  color: #778ba9;
+}
+.dna-node .react-flow__handle {
+  width: 7px;
+  height: 7px;
+  background: #8da9e2;
+  border: 1px solid #101927;
+}
+.dna-map .react-flow__edge-path {
+  stroke: #687eaa;
+  stroke-width: 1.5;
+}
+.dna-map .react-flow__arrowhead {
+  fill: #8ca7d8;
+}
+.dna-map .dna-edge--active .react-flow__edge-path {
+  stroke: #8bcfcf;
+  stroke-width: 2.5;
+}
+.dna-map .dna-edge--dimmed {
+  opacity: 0.12;
+}
+.dna-map .react-flow__controls {
+  box-shadow: none;
+  border: 1px solid #303c50;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.dna-map .react-flow__controls-button {
+  background: #171f2b;
+  border-bottom: 1px solid #303c50;
+  fill: #bac8e1;
+  color: #bac8e1;
+}
+.dna-map .react-flow__controls-button:hover {
+  background: #283447;
+}
+.dna-map .react-flow__attribution {
+  background: #101720bb;
+  color: #8694a7;
+  font-size: 9px;
+}
+.dna-graph-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dna-graph-toolbar span,
+.dna-graph-toolbar button,
+.dna-graph-legend {
+  font: 9px monospace;
+  color: #91a0b7;
+  letter-spacing: 0.04em;
+}
+.dna-graph-toolbar span {
+  margin-right: 9px;
+}
+.dna-graph-toolbar i,
+.dna-graph-legend i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6ed6c1;
+  margin-right: 5px;
+}
+.dna-graph-toolbar button {
+  border: 1px solid #334058;
+  background: #17202e;
+  border-radius: 5px;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.dna-graph-toolbar button:hover {
+  color: white;
+  border-color: #8098c1;
+}
+.dna-graph-toolbar button:focus-visible {
+  outline: 2px solid #a4baff;
+  outline-offset: 2px;
+}
+.dna-graph-legend {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  display: flex;
+  gap: 16px;
+  background: #111923e8;
+  padding: 9px;
+  border: 1px solid #2a3445;
+  border-radius: 5px;
+}
+.dna-graph-legend span:first-child i {
+  background: #93aaff;
+}
+.dna-graph-notice {
+  position: absolute;
+  top: 50px;
+  left: 18px;
+  right: 18px;
+  z-index: 6;
+  border: 1px solid #665b38;
+  background: #302a1cef;
+  color: #e5d2a0;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 11px;
+}
+.dna-graph-warning {
+  top: 86px;
+}
+.dna-graph-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0b1017dd;
+  color: #b8c7dc;
+  font-size: 12px;
+}
+.dna-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #405373;
+  border-top-color: #adc3ff;
+  animation: dna-spin 1s linear infinite;
+}
+@keyframes dna-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dna-graph-empty {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  color: #aab9cf;
+  min-height: 360px;
+}
+.dna-graph-empty span {
+  font-size: 12px;
+  color: #7d8ba0;
+}
+@media (max-width: 760px) {
+  .dna-graph-legend {
+    bottom: 12px;
+    left: 10px;
+    gap: 8px;
+    font-size: 8px;
+  }
+  .dna-graph-toolbar {
+    right: 10px;
+  }
+  .dna-graph-toolbar span {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dna-node {
+    transition: none;
+  }
+  .dna-spinner {
+    animation: none;
+  }
+}

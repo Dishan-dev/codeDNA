@@ -17,5 +17,11 @@
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@codedna/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@codedna/core": "workspace:*"
   }
 }
