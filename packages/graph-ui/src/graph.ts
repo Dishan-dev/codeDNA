@@ -57,7 +57,7 @@ export function adaptGraph(graph: DependencyGraph): AdaptedGraph {
   return { nodes, edges };
 }
 export function neighborhood(
-  edges: readonly MapEdge[],
+  edges: readonly { id: string; source: string; target: string }[],
   selectedId: string | null,
 ) {
   const nodes = new Set<string>();

@@ -209,8 +209,8 @@ export default function Home() {
             <span>best starting point.</span>
           </h2>
           <p>
-            Get a feel for the workspace with a small bundled example. Real
-            repository analysis is on its way.
+            Get a feel for the workspace with a bundled example, or explore a
+            public GitHub repository.
           </p>
           <Link className="button button--primary" href="/explorer">
             Explore the example <ArrowRight size={16} />

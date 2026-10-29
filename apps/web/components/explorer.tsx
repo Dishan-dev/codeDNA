@@ -1,6 +1,9 @@
-'use client';
+﻿'use client';
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
-import { ArchitectureMap } from '@codedna/graph-ui';
+import { ArchitectureMap, UIFlowMap } from '@codedna/graph-ui';
+import type { UIFlowAnalysis } from '@codedna/core';
+import { screenForFile } from '@/lib/explorer-session';
+import type { ExplorerSession } from '@/lib/explorer-session';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -92,11 +95,19 @@ export function Workspace({
   mode,
   selectedId,
   onSelectionChange,
+  uiFlow,
+  uiSelectedId,
+  onUISelection,
+  frameworkDetected,
 }: {
   state: WorkspaceState;
   mode: Mode;
   selectedId: string | null;
   onSelectionChange: (id: string | null) => void;
+  uiFlow: UIFlowAnalysis;
+  uiSelectedId: string | null;
+  onUISelection: (id: string | null) => void;
+  frameworkDetected: boolean;
 }) {
   if (state.status === 'loading')
     return (
@@ -134,6 +145,16 @@ export function Workspace({
         graph={state.result.dependencyGraph}
         selectedId={selectedId}
         onSelectionChange={onSelectionChange}
+      />
+    );
+  if (mode === 'UI Flow')
+    return (
+      <UIFlowMap
+        graph={uiFlow.graph}
+        diagnostics={uiFlow.diagnostics}
+        selectedId={uiSelectedId}
+        onSelectionChange={onUISelection}
+        frameworkDetected={frameworkDetected}
       />
     );
   return (
@@ -175,8 +196,10 @@ function FileList({
   selected,
   onSelect,
   query,
+  repositoryName,
 }: {
   files: SourceFile[];
+  repositoryName: string;
   selected: string | null;
   onSelect: (file: SourceFile) => void;
   query: string;
@@ -189,7 +212,7 @@ function FileList({
       <div className="tree-root">
         <ChevronDown size={14} />
         <Folder size={15} />
-        <span>example-repository</span>
+        <span>{repositoryName}</span>
       </div>
       {matches.length ? (
         matches.map((file) => (
@@ -212,16 +235,60 @@ function FileList({
 export function Explorer({
   snapshot,
   result,
+  uiFlow,
+  repositoryName,
+  source,
+  completeness,
+  acquisitionDiagnostics,
 }: {
   snapshot: RepositorySnapshot;
   result?: AnalysisResult;
+  uiFlow: UIFlowAnalysis;
+  repositoryName: string;
+  source: ExplorerSession['source'];
+  completeness: ExplorerSession['completeness'];
+  acquisitionDiagnostics: ExplorerSession['acquisitionDiagnostics'];
 }) {
   const [mode, setMode] = useState<Mode>('Architecture');
   const [left, setLeft] = useState(true);
   const [right, setRight] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [uiSelectedId, setUISelectedId] = useState<string | null>(null);
+  const [uiFilePath, setUIFilePath] = useState<string | null>(null);
+  const [showScreenSource, setShowScreenSource] = useState(false);
+  const selectedScreen = uiFlow.graph.nodes.find(
+    (node) => node.id === uiSelectedId,
+  );
+  const activePath =
+    mode === 'UI Flow'
+      ? (selectedScreen?.sourceFile ?? uiFilePath)
+      : selectedId?.startsWith('file:')
+        ? selectedId.slice(5)
+        : null;
   const selected =
-    snapshot.files.find((file) => `file:${file.path}` === selectedId) ?? null;
+    snapshot.files.find((file) => file.path === activePath) ?? null;
+  const onUISelection = useCallback((id: string | null) => {
+    setUISelectedId(id);
+    setUIFilePath(null);
+    setShowScreenSource(false);
+    if (id) {
+      setRight(true);
+      if (window.matchMedia('(max-width: 760px)').matches) setLeft(false);
+    }
+  }, []);
+  const frameworkDetected =
+    !!uiFlow.framework ||
+    snapshot.files.some((file) => /^(?:src\/)?app\//.test(file.path));
+  const screenEvents =
+    uiFlow.graph.navigationEvents?.filter(
+      (event) => event.sourceId === uiSelectedId,
+    ) ?? [];
+  const incoming = uiFlow.graph.edges.filter(
+    (edge) => edge.targetId === uiSelectedId,
+  );
+  const unattributed =
+    uiFlow.graph.navigationEvents?.filter((event) => !event.sourceId) ?? [];
+
   const selectedNode = result?.dependencyGraph.nodes.find(
     (node) => node.id === selectedId,
   );
@@ -258,15 +325,18 @@ export function Explorer({
             </span>
             <div>
               <small>REPOSITORY</small>
-              <strong>example-repository</strong>
+              <strong>{repositoryName}</strong>
             </div>
             <ChevronDown size={14} />
           </div>
-          <Badge className="sample-badge">SAMPLE</Badge>
+          <Badge className="sample-badge">
+            {source === 'sample' ? 'SAMPLE' : 'GITHUB'}
+          </Badge>
         </div>
         <div className="explorer-header-right">
           <span className="header-note">
-            <span className="status-dot" /> LOCAL EXAMPLE
+            <span className="status-dot" />{' '}
+            {source === 'sample' ? 'LOCAL EXAMPLE' : 'PUBLIC REPOSITORY'}
           </span>
           <Tooltip label="About this workspace">
             <a
@@ -360,15 +430,23 @@ export function Explorer({
               files={snapshot.files}
               selected={selected?.path ?? null}
               onSelect={(file) => {
-                onSelectionChange(`file:${file.path}`);
+                if (mode === 'UI Flow') {
+                  const screen = screenForFile(file.path, uiFlow);
+                  setUISelectedId(screen);
+                  setUIFilePath(file.path);
+                  setShowScreenSource(false);
+                } else onSelectionChange(`file:${file.path}`);
                 setRight(true);
                 if (window.matchMedia('(max-width: 760px)').matches)
                   setLeft(false);
               }}
               query={query}
+              repositoryName={repositoryName}
             />
             <div className="panel-bottom">
-              <span className="status-dot" /> BUNDLED EXAMPLE <span>v1.0</span>
+              <span className="status-dot" />{' '}
+              {source === 'sample' ? 'BUNDLED EXAMPLE' : 'PUBLIC REPOSITORY'}{' '}
+              <span>v1.0</span>
             </div>
           </Panel>
         )}
@@ -387,20 +465,79 @@ export function Explorer({
             </div>
             <Badge>PREVIEW</Badge>
           </div>
-          {result && result.diagnostics.length > 0 && (
+          {mode === 'Architecture' &&
+            result &&
+            result.diagnostics.length > 0 && (
+              <details className="analysis-diagnostics">
+                <summary>
+                  {result.diagnostics.length} analysis diagnostic
+                  {result.diagnostics.length === 1 ? '' : 's'}
+                </summary>
+                <ul>
+                  {result.diagnostics.map((d) => (
+                    <li key={d.id}>
+                      <strong>{d.severity}</strong>{' '}
+                      {d.location
+                        ? `${d.location.path}:${d.location.start.line}:${d.location.start.column} - `
+                        : ''}
+                      {d.message}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          {!completeness.complete && (
             <details className="analysis-diagnostics">
               <summary>
-                {result.diagnostics.length} analysis diagnostic
-                {result.diagnostics.length === 1 ? '' : 's'}
+                Partial repository: {completeness.skippedFiles} skipped entries
               </summary>
               <ul>
-                {result.diagnostics.map((d) => (
-                  <li key={d.id}>
-                    <strong>{d.severity}</strong>{' '}
+                {acquisitionDiagnostics.map((d, i) => (
+                  <li key={`${d.path}:${d.code}:${i}`}>
+                    {d.path}: {d.message}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {mode === 'UI Flow' && source === 'sample' && !frameworkDetected && (
+            <Link href="/explorer?example=next" className="ui-example-link">
+              Try the Next.js App Router example
+            </Link>
+          )}
+          {mode === 'UI Flow' && uiFlow.diagnostics.length > 0 && (
+            <details className="analysis-diagnostics">
+              <summary>
+                {uiFlow.diagnostics.length} UI Flow diagnostic
+                {uiFlow.diagnostics.length === 1 ? '' : 's'}
+              </summary>
+              <ul>
+                {uiFlow.diagnostics.map((d, i) => (
+                  <li key={`${d.id}:${i}`}>
                     {d.location
                       ? `${d.location.path}:${d.location.start.line}:${d.location.start.column} - `
                       : ''}
                     {d.message}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {mode === 'UI Flow' && unattributed.length > 0 && (
+            <details className="analysis-diagnostics">
+              <summary>
+                {unattributed.length} unattributed navigation event
+                {unattributed.length === 1 ? '' : 's'}
+              </summary>
+              <ul>
+                {unattributed.map((event) => (
+                  <li key={event.id}>
+                    {event.kind}{' '}
+                    {event.navigationPath?.join(' ? ') ??
+                      event.destination ??
+                      '(dynamic)'}{' '}
+                    ? {event.resolution} at {event.location.path}:
+                    {event.location.start.line}
                   </li>
                 ))}
               </ul>
@@ -411,13 +548,20 @@ export function Explorer({
             mode={mode}
             selectedId={selectedId}
             onSelectionChange={onSelectionChange}
+            uiFlow={uiFlow}
+            uiSelectedId={uiSelectedId}
+            onUISelection={onUISelection}
+            frameworkDetected={frameworkDetected}
           />
           <div className="workspace-footer">
             <span>
-              <span className="status-dot" /> SAMPLE DATA
+              <span className="status-dot" />{' '}
+              {source === 'sample' ? 'SAMPLE DATA' : 'PUBLIC REPOSITORY'}
             </span>
             <span id="workspace-help">
-              Importer to dependency. Repository import is coming soon.
+              {mode === 'UI Flow'
+                ? 'Detected navigation is static evidence, not reachability.'
+                : 'Importer to dependency.'}
             </span>
           </div>
         </section>
@@ -437,7 +581,94 @@ export function Explorer({
                 <PanelRightClose size={16} />
               </Button>
             </div>
-            {selected ? (
+            {mode === 'UI Flow' && selectedScreen ? (
+              <div className="inspector-content">
+                <div className="inspector-label">
+                  SCREEN{' '}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Clear selected screen"
+                    onClick={() => onUISelection(null)}
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
+                <div className="selected-file">
+                  <span className="node-icon violet">
+                    <Waypoints size={18} />
+                  </span>
+                  <div>
+                    <strong>
+                      {selectedScreen.routePath ?? selectedScreen.label}
+                    </strong>
+                    <small>{selectedScreen.sourceFile}</small>
+                  </div>
+                </div>
+                <p className="inspector-footnote">
+                  Framework: {selectedScreen.framework ?? 'unknown'}. Static
+                  evidence does not guarantee reachability.
+                </p>
+                {selected && (
+                  <>
+                    <Button
+                      onClick={() => setShowScreenSource(!showScreenSource)}
+                    >
+                      {showScreenSource ? 'Hide source' : 'View source file'}
+                    </Button>
+                    {showScreenSource && (
+                      <pre className="source-preview">
+                        <code>{selected.content}</code>
+                      </pre>
+                    )}
+                  </>
+                )}
+                <div className="inspector-rule" />
+                <div className="inspector-label">
+                  OUTGOING EVENTS <span>{screenEvents.length}</span>
+                </div>
+                {screenEvents.length ? (
+                  <ul className="flow-events">
+                    {screenEvents.map((event) => (
+                      <li key={event.id}>
+                        <strong>{event.kind}</strong>{' '}
+                        <span>{event.resolution}</span>
+                        <div>
+                          {event.navigationPath?.join(' ? ') ??
+                            event.destination ??
+                            '(no static destination)'}
+                        </div>
+                        <small>
+                          {event.location.path}:{event.location.start.line}:
+                          {event.location.start.column}
+                        </small>
+                        {event.metadata.evidence.map((e, i) => (
+                          <small key={i}>{e.description}</small>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="inspector-footnote">
+                    No navigation detected in this screen.
+                  </p>
+                )}
+                <div className="inspector-rule" />
+                <div className="inspector-label">
+                  INCOMING EDGES <span>{incoming.length}</span>
+                </div>
+                <ul className="flow-events">
+                  {incoming.map((edge) => (
+                    <li key={edge.id}>
+                      {uiFlow.graph.nodes.find(
+                        (node) => node.id === edge.sourceId,
+                      )?.routePath ?? edge.sourceId}{' '}
+                      <small>{edge.kind ?? 'navigation'}</small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : selected ? (
               <div className="inspector-content">
                 <div className="inspector-label">
                   SELECTED FILE{' '}
@@ -461,17 +692,17 @@ export function Explorer({
                 </div>
                 <div className="inspector-rule" />
                 <div className="inspector-label">
-                  SOURCE <span>EXAMPLE</span>
+                  SOURCE{' '}
+                  <span>{source === 'sample' ? 'EXAMPLE' : 'REPOSITORY'}</span>
                 </div>
                 <pre className="source-preview">
                   <code>{selected.content}</code>
                 </pre>
                 <p className="inspector-footnote">
-                  Source from the bundled example. Select a connected node to
-                  explore its dependencies.
+                  Source from the active repository snapshot.
                 </p>
               </div>
-            ) : selectedNode ? (
+            ) : mode !== 'UI Flow' && selectedNode ? (
               <div className="inspector-content">
                 <div className="inspector-label">
                   EXTERNAL PACKAGE{' '}

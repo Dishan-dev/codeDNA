@@ -1,10 +1,13 @@
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkNode } from 'elkjs/lib/elk-api.js';
-import type { AdaptedGraph } from './graph.js';
+type LayoutGraph = {
+  nodes: { id: string; position: { x: number; y: number } }[];
+  edges: { id: string; source: string; target: string }[];
+};
 export const NODE_WIDTH = 220;
 export const NODE_HEIGHT = 82;
 /** Deterministic grid used when layout fails; no nodes are discarded. */
-export function fallbackLayout(graph: AdaptedGraph): AdaptedGraph {
+export function fallbackLayout<T extends LayoutGraph>(graph: T): T {
   const columns = Math.max(1, Math.ceil(Math.sqrt(graph.nodes.length)));
   return {
     ...graph,
@@ -17,7 +20,7 @@ export function fallbackLayout(graph: AdaptedGraph): AdaptedGraph {
     })),
   };
 }
-export async function layoutGraph(graph: AdaptedGraph): Promise<AdaptedGraph> {
+export async function layoutGraph<T extends LayoutGraph>(graph: T): Promise<T> {
   if (!graph.nodes.length) return graph;
   const Constructor = ELK as unknown as new () => {
     layout(graph: ElkNode): Promise<ElkNode>;

@@ -1,4 +1,5 @@
 import { acquireRepository, AcquisitionError } from '@codedna/github';
+import { analyzeSnapshot, analyzeUIFlows } from '@codedna/core';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -112,7 +113,9 @@ export async function POST(request: Request) {
       ...(token ? { token } : {}),
       signal: request.signal,
     });
-    return reply(result, 200);
+    const analysis = analyzeSnapshot(result.snapshot);
+    const uiFlow = analyzeUIFlows(result.snapshot);
+    return reply({ ...result, analysis, uiFlow }, 200);
   } catch (error) {
     if (error instanceof AcquisitionError)
       return reply(

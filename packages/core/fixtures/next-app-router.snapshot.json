@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "id": "next-app-router-example",
+  "files": [
+    {
+      "id": "app/layout.tsx",
+      "path": "app/layout.tsx",
+      "content": "export default function Layout({ children }) { return children; }\n"
+    },
+    {
+      "id": "app/page.tsx",
+      "path": "app/page.tsx",
+      "content": "import Link from 'next/link';\nexport default function Home() { return <Link href=\"/projects/42\">Project</Link>; }\n"
+    },
+    {
+      "id": "app/projects/[id]/page.tsx",
+      "path": "app/projects/[id]/page.tsx",
+      "content": "import { useRouter } from 'next/navigation';\nexport default function Project() { const router = useRouter(); return <button onClick={() => router.back()}>Back</button>; }\n"
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "graph": {
+    "schemaVersion": "1.0",
+    "nodes": [
+      {
+        "id": "screen:app/page.tsx",
+        "label": "/",
+        "framework": "next-app-router",
+        "routePath": "/",
+        "sourceFile": "app/page.tsx",
+        "boundaries": [
+          {
+            "kind": "layout",
+            "path": "app/layout.tsx"
+          }
+        ],
+        "location": {
+          "path": "app/page.tsx",
+          "start": {
+            "line": 1,
+            "column": 1
+          },
+          "end": {
+            "line": 1,
+            "column": 1
+          }
+        },
+        "metadata": {
+          "confidence": 1,
+          "evidence": [
+            {
+              "description": "App Router page convention",
+              "location": {
+                "path": "app/page.tsx",
+                "start": {
+                  "line": 1,
+                  "column": 1
+                },
+                "end": {
+                  "line": 1,
+                  "column": 1
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "screen:app/projects/[id]/page.tsx",
+        "label": "/projects/[id]",
+        "framework": "next-app-router",
+        "routePath": "/projects/[id]",
+        "sourceFile": "app/projects/[id]/page.tsx",
+        "boundaries": [
+          {
+            "kind": "layout",
+            "path": "app/layout.tsx"
+          }
+        ],
+        "location": {
+          "path": "app/projects/[id]/page.tsx",
+          "start": {
+            "line": 1,
+            "column": 1
+          },
+          "end": {
+            "line": 1,
+            "column": 1
+          }
+        },
+        "metadata": {
+          "confidence": 1,
+          "evidence": [
+            {
+              "description": "App Router page convention",
+              "location": {
+                "path": "app/projects/[id]/page.tsx",
+                "start": {
+                  "line": 1,
+                  "column": 1
+                },
+                "end": {
+                  "line": 1,
+                  "column": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:navigation:app%2Fpage.tsx:2:47:link:screen%3Aapp%2Fpage.tsx",
+        "sourceId": "screen:app/page.tsx",
+        "targetId": "screen:app/projects/[id]/page.tsx",
+        "kind": "link",
+        "location": {
+          "path": "app/page.tsx",
+          "start": {
+            "line": 2,
+            "column": 47
+          },
+          "end": {
+            "line": 2,
+            "column": 66
+          }
+        },
+        "metadata": {
+          "confidence": 1,
+          "evidence": [
+            {
+              "description": "Navigation in page component app/page.tsx",
+              "location": {
+                "path": "app/page.tsx",
+                "start": {
+                  "line": 2,
+                  "column": 47
+                },
+                "end": {
+                  "line": 2,
+                  "column": 66
+                }
+              }
+            }
+          ]
+        },
+        "destination": "/projects/42"
+      }
+    ],
+    "navigationEvents": [
+      {
+        "id": "navigation:app%2Fpage.tsx:2:47:link:screen%3Aapp%2Fpage.tsx",
+        "sourceId": "screen:app/page.tsx",
+        "kind": "link",
+        "resolution": "internal",
+        "location": {
+          "path": "app/page.tsx",
+          "start": {
+            "line": 2,
+            "column": 47
+          },
+          "end": {
+            "line": 2,
+            "column": 66
+          }
+        },
+        "metadata": {
+          "confidence": 1,
+          "evidence": [
+            {
+              "description": "Navigation in page component app/page.tsx",
+              "location": {
+                "path": "app/page.tsx",
+                "start": {
+                  "line": 2,
+                  "column": 47
+                },
+                "end": {
+                  "line": 2,
+                  "column": 66
+                }
+              }
+            }
+          ]
+        },
+        "destination": "/projects/42",
+        "targetId": "screen:app/projects/[id]/page.tsx"
+      },
+      {
+        "id": "navigation:app%2Fprojects%2F%5Bid%5D%2Fpage.tsx:2:95:back:screen%3Aapp%2Fprojects%2F%5Bid%5D%2Fpage.tsx",
+        "sourceId": "screen:app/projects/[id]/page.tsx",
+        "kind": "back",
+        "resolution": "dynamic",
+        "location": {
+          "path": "app/projects/[id]/page.tsx",
+          "start": {
+            "line": 2,
+            "column": 95
+          },
+          "end": {
+            "line": 2,
+            "column": 108
+          }
+        },
+        "metadata": {
+          "confidence": 1,
+          "evidence": [
+            {
+              "description": "Navigation in page component app/projects/[id]/page.tsx",
+              "location": {
+                "path": "app/projects/[id]/page.tsx",
+                "start": {
+                  "line": 2,
+                  "column": 95
+                },
+                "end": {
+                  "line": 2,
+                  "column": 108
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "id": "ui-diagnostic:ui-navigation-history:app%2Fprojects%2F%5Bid%5D%2Fpage.tsx%3A2%3A95",
+      "code": "ui-navigation-history",
+      "severity": "warning",
+      "message": "History navigation has no statically known destination.",
+      "location": {
+        "path": "app/projects/[id]/page.tsx",
+        "start": {
+          "line": 2,
+          "column": 95
+        },
+        "end": {
+          "line": 2,
+          "column": 108
+        }
+      }
+    }
+  ]
+}

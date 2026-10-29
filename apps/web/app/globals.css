@@ -1521,3 +1521,45 @@ button:disabled {
   padding: 0 16px 12px 28px;
   line-height: 1.7;
 }
+
+.flow-events {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  color: #abb9ce;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.flow-events li {
+  border: 1px solid #293447;
+  background: #111923;
+  border-radius: 6px;
+  padding: 9px;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.flow-events li strong {
+  color: #c3b2ff;
+  text-transform: uppercase;
+  font-size: 9px;
+}
+.flow-events li span {
+  float: right;
+  color: #8bbdb4;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.flow-events li small {
+  display: block;
+  color: #8492a8;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.ui-example-link {
+  position: relative;
+  z-index: 3;
+  margin: 0 20px;
+  color: #b8c9ff;
+  font-size: 12px;
+  text-decoration: underline;
+}

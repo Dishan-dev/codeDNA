@@ -62,9 +62,47 @@ export interface DependencyGraph {
   nodes: DependencyNode[];
   edges: DependencyEdge[];
 }
+export type UINavigationKind =
+  | 'link'
+  | 'push'
+  | 'navigate'
+  | 'replace'
+  | 'back'
+  | 'history'
+  | 'redirect';
+export type UINavigationResolution =
+  | 'internal'
+  | 'external'
+  | 'dynamic'
+  | 'unresolved';
+/** Static evidence of a navigation action; an event does not assert runtime reachability. */
+export interface UINavigationEvent {
+  id: StableId;
+  sourceId?: StableId;
+  targetId?: StableId;
+  kind: UINavigationKind;
+  resolution: UINavigationResolution;
+  destination?: string;
+  /** Literal nested navigator targets, when available. */
+  navigationPath?: string[];
+  location: SourceLocation;
+  metadata: AnalysisMetadata;
+}
 export interface UIFlowNode {
   id: StableId;
   label: string;
+  framework?: string;
+  /** Navigator containing a registered screen, when applicable. */
+  navigator?: {
+    id: StableId;
+    name: string;
+    kind: string;
+    parentIds?: StableId[];
+    group?: string;
+  };
+  routePath?: string;
+  sourceFile?: string;
+  boundaries?: { kind: 'layout' | 'loading' | 'error'; path: string }[];
   location?: SourceLocation;
   metadata: AnalysisMetadata;
 }
@@ -72,12 +110,18 @@ export interface UIFlowEdge {
   id: StableId;
   sourceId: StableId;
   targetId: StableId;
+  kind?: UINavigationKind;
+  destination?: string;
+  /** Literal nested navigator targets, when available. */
+  navigationPath?: string[];
+  location?: SourceLocation;
   metadata: AnalysisMetadata;
 }
 export interface UIFlowGraph {
   schemaVersion: SchemaVersion;
   nodes: UIFlowNode[];
   edges: UIFlowEdge[];
+  navigationEvents?: UINavigationEvent[];
 }
 export interface AnalysisResult {
   schemaVersion: SchemaVersion;

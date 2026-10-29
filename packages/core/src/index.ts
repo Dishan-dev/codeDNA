@@ -9,6 +9,19 @@ import type {
   SourceLocation,
 } from '@codedna/shared';
 import { validateSnapshot, type AnalysisOptions } from './validation.js';
+import { parseSource, sourceLocation } from './source.js';
+export {
+  analyzeUIFlows,
+  nextAppRouterAdapter,
+  reactRouterAdapter,
+  expoRouterAdapter,
+  reactNavigationAdapter,
+} from './ui-flow/index.js';
+export type {
+  UIFlowAnalysis,
+  UIFlowFrameworkAdapter,
+  UIFlowContext,
+} from './ui-flow/index.js';
 export { SnapshotValidationError } from './validation.js';
 export type { AnalysisOptions } from './validation.js';
 
@@ -18,19 +31,7 @@ const fileId = (path: string) => `file:${path}`;
 const packageId = (name: string) => `package:${name}`;
 const dirname = (p: string) =>
   p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
-const location = (
-  file: ts.SourceFile,
-  start: number,
-  end: number,
-): SourceLocation => {
-  const a = file.getLineAndCharacterOfPosition(start);
-  const b = file.getLineAndCharacterOfPosition(end);
-  return {
-    path: file.fileName.slice(1),
-    start: { line: a.line + 1, column: a.character + 1 },
-    end: { line: b.line + 1, column: b.character + 1 },
-  };
-};
+const location = sourceLocation;
 interface Config {
   options: ts.CompilerOptions;
   patterns: string[];
@@ -184,20 +185,7 @@ export function analyzeSnapshot(
     }
   for (const file of checked.files) {
     if (isConfig(file.path)) continue;
-    const scriptKind = file.path.endsWith('.tsx')
-      ? ts.ScriptKind.TSX
-      : file.path.endsWith('.jsx')
-        ? ts.ScriptKind.JSX
-        : file.path.endsWith('.js')
-          ? ts.ScriptKind.JS
-          : ts.ScriptKind.TS;
-    const source = ts.createSourceFile(
-      `/${file.path}`,
-      file.content,
-      ts.ScriptTarget.Latest,
-      true,
-      scriptKind,
-    );
+    const source = parseSource(file);
     const parseDiagnostics = (
       source as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }
     ).parseDiagnostics;

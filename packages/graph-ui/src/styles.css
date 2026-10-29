@@ -273,3 +273,31 @@
     animation: none;
   }
 }
+
+.dna-screen {
+  background: #191d30;
+  border-color: #514a73;
+}
+.dna-screen .dna-node-icon {
+  background: #332e50;
+  color: #c3b1ff;
+}
+.dna-flow-noedges {
+  position: absolute;
+  top: 50px;
+  left: 18px;
+  z-index: 5;
+  border: 1px solid #34445f;
+  background: #151d2bef;
+  color: #bac8de;
+  padding: 9px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.dna-screen.dna-node--selected {
+  border-color: #b6a3ff;
+}
+.dna-screen.dna-node--connected {
+  border-color: #6c9fae;
+}
