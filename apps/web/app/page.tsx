@@ -151,7 +151,14 @@ export default function Home() {
             architecture, follow the connections, and make your next move with
             confidence.
           </p>
-          <RepositoryForm />
+          {process.env.NODE_ENV === 'production' ? (
+            <p className="form-message" role="status">
+              Demo-only mode: GitHub repository import is disabled. Explore the
+              bundled example below.
+            </p>
+          ) : (
+            <RepositoryForm />
+          )}
           <div className="hero-secondary">
             <Link href="/explorer">
               Explore the example <ArrowRight size={15} />

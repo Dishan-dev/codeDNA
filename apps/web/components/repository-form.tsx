@@ -99,7 +99,16 @@ export function RepositoryForm() {
           aria-describedby="repo-help"
         />
         <Button variant="primary" type="submit" disabled={loading}>
-          {loading ? 'Analyzing...' : 'Explore'} <ArrowRight size={16} />
+          {loading ? (
+            <>
+              Analyzing...{' '}
+              <span className="loading-button-spinner" aria-hidden="true" />
+            </>
+          ) : (
+            <>
+              Explore <ArrowRight size={16} />
+            </>
+          )}
         </Button>
       </div>
       <p

@@ -35,7 +35,17 @@
     force = false,
   ): Promise<{ snapshot: TSnapshot; value: TResult }> {
     const existing = this.cache.get(key);
-    if (existing && !force) return existing;
+    if (existing && !force) {
+      if (this.controller) {
+        this.generation++;
+        this.controller.abort();
+        this.controller = undefined;
+        this.activeKey = undefined;
+      }
+      this.cache.delete(key);
+      this.cache.set(key, existing);
+      return existing;
+    }
     this.controller?.abort();
     const controller = new AbortController();
     this.controller = controller;
@@ -76,10 +86,17 @@
       if (controller.signal.aborted || generation !== this.generation)
         throw new Error('Analysis cancelled');
       const entry = { snapshot, value, revision: snapshot.snapshot.revision };
+      this.cache.delete(key);
       this.cache.set(key, entry);
+      while (this.cache.size > 3)
+        this.cache.delete(this.cache.keys().next().value!);
       return entry;
     } finally {
       clearTimeout(timer);
+      if (this.controller === controller) {
+        this.controller = undefined;
+        this.activeKey = undefined;
+      }
     }
   }
 }

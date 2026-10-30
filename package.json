@@ -10,16 +10,27 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "test:e2e": "playwright test",
+    "benchmark": "node scripts/benchmark.mjs",
+    "release:check": "node scripts/release-check.mjs",
+    "verify:web-output": "node scripts/verify-web-output.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.58.2",
     "@types/node": "22.13.10",
     "eslint": "10.13.0",
+    "fflate": "0.8.2",
     "prettier": "3.5.3",
     "turbo": "2.4.4",
     "typescript": "5.8.2",
     "typescript-eslint": "8.72.1",
-    "vitest": "3.0.8"
+    "vitest": "4.1.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.23"
+    }
   }
 }

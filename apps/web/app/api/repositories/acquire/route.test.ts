@@ -14,6 +14,20 @@ vi.mock('@codedna/github', async (importOriginal) => {
   };
 });
 describe('acquisition endpoint', () => {
+  it('fails closed in production without distributed protection', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      const response = await POST(
+        new Request('http://localhost/api/repositories/acquire', {
+          method: 'POST',
+        }),
+      );
+      expect(response.status).toBe(503);
+      expect((await response.json()).error.code).toBe('unavailable');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('rejects malformed requests without caching', async () => {
     const response = await POST(
       new Request('http://localhost/api/repositories/acquire', {
@@ -74,5 +88,35 @@ describe('acquisition endpoint', () => {
         message: 'GitHub rate limit reached. Try again later.',
       },
     });
+  });
+  it('releases a slot when a request body never completes', async () => {
+    vi.useFakeTimers();
+    try {
+      const body = new ReadableStream<Uint8Array>({ start() {} });
+      const request = new Request('http://localhost/api/repositories/acquire', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        duplex: 'half',
+      } as RequestInit);
+      const pending = POST(request);
+      await vi.advanceTimersByTimeAsync(5001);
+      expect((await pending).status).toBe(408);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('limits request bursts within a process', async () => {
+    let response: Response | undefined;
+    for (let i = 0; i < 31; i++) {
+      response = await POST(
+        new Request('http://localhost/api/repositories/acquire', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        }),
+      );
+    }
+    expect(response?.status).toBe(429);
   });
 });

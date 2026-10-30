@@ -1,7 +1,7 @@
 # Architecture
 
 - `apps/web`: Next.js web entry point, with Tailwind and configuration ready for shadcn/ui components.
-- `apps/vscode`: placeholder for a future VS Code extension.
+- `apps/vscode`: VS Code extension host, local workspace snapshot adapter, analysis worker and Explorer webview.
 - `packages/shared`: versioned, framework-independent snapshot and analysis contracts.
 - `packages/core`: snapshot-in, result-out analysis engine; no filesystem fetching, browser, React, Next.js, or VS Code dependencies.
 - `packages/github`: server-side public GitHub snapshot acquisition adapter with fixed API endpoints and bounded resources.
@@ -21,7 +21,7 @@ Static imports, re-exports, literal dynamic imports and literal `require` calls 
 
 ## Web shell
 
-The web app owns route composition, design primitives, repository URL validation, and Explorer interaction state. The bundled example and the separate App Router fixture are analyzed at the server module boundary. Public imports are acquired and analyzed once in the acquisition route; the snapshot, both analysis results, and completeness diagnostics are retained together in the browser tab session. Switching modes does not repeat analysis. Impact and Learning modes remain placeholders.
+The web app owns route composition, design primitives, repository URL validation, and Explorer interaction state. The bundled example and the separate App Router fixture are analyzed at the server module boundary. In development, public imports are acquired once and analyzed in a bounded worker in the acquisition route; production acquisition is disabled until distributed protection is integrated. the snapshot, both analysis results, and completeness diagnostics are retained together in the browser tab session. Switching modes does not repeat analysis. Impact and Learning modes consume the same session and its existing graphs.
 
 ## Architecture map
 
@@ -110,3 +110,22 @@ The default limit is six files per lesson and three questions, with at most seve
 Knowledge checks use only source-evidenced edges. An importer question requires exactly one distinct direct importer and two non-importing file choices; a navigation question requires a single detected source for a uniquely labeled target and two uniquely labeled distractors. Ambiguous cases are omitted. Answers and explanations cite the underlying edge evidence; a correct answer only describes the available static graph, not reachability or runtime behavior. Diagnostics and partial acquisition can mean the graph is incomplete.
 
 The Explorer keeps the current lesson, completed IDs and selected answers in component memory while switching modes. Its key includes source, repository identity, snapshot ID and revision, so changing them remounts the Explorer and clears progress. Progress is not persisted, sent to a server or synchronized; closing the Explorer discards it. Repository content is rendered as text rather than executed. AI-assisted explanations could be added later behind an explicit evidence and privacy boundary; no model or external service is used here.
+
+## VS Code extension
+
+The extension acquires files from one trusted local workspace folder with VS Code workspace APIs, respecting `files.exclude` and `search.exclude`, filtering dependencies and generated output, and rejecting symbolic links. It checks resolved paths against the selected folder before reading or opening files; concurrent filesystem changes can still race those checks. Acquisition is bounded to 1,000 files, 2 MiB each, 50 MiB total and 30 seconds. Skipped files and capped searches produce explicit partial diagnostics. A SHA-256 fingerprint over paths and contents identifies the local snapshot. No source is uploaded and repository code is never executed.
+
+The extension host starts a cancellable, 30-second worker to run dependency analysis, UI-flow analysis and the learning-plan generator. The host reuses analysis by workspace and fingerprint, invalidates on relevant file changes, and rejects stale async results. Impact uses the existing bounded reverse traversal. The webview receives graph and evidence data rather than source text, uses `@codedna/graph-ui`, and asks the host to open validated snapshot paths at source locations. The CSP disallows remote connections and inline scripts; dynamic graph styles require inline styles. Incoming messages use a versioned allowlist, and learning progress is held only in memory for up to three snapshot identities. Large graphs require an explicit layout request. Manual VS Code UI verification remains outstanding.
+
+## Security and deployment boundaries
+
+See [security and privacy](security.md) for the threat model, acquisition limits, extension workspace safeguards and outstanding release blockers. GitHub acquisition's body timeout and per-process request caps supplement, but do not replace, a shared ingress limiter or isolated analysis workers. Local descriptor-based reads check containment and file identity, but do not eliminate filesystem races; source opening remains a separate VS Code operation. The extension caches at most three recent workspace analyses.
+
+
+## Verification and release boundaries
+
+Browser integration uses Playwright against a local Next.js development server with deterministic mocked acquisition responses and Next.js and React Router fixtures; adapter and worker tests exercise server logic separately. CI installs Chromium and runs the suite. The Extension Development Host smoke uses an isolated test profile and a bundled workspace fixture, checking activation, commands, trusted analysis, impact and refresh; it does not drive webview rendering or untrusted-host prompts. Additional protocol and untrusted-workspace unit tests do not replace manual host verification.
+
+`pnpm benchmark` creates synthetic snapshots of 100, 500 and 2,000 route files and reports generation, analysis, impact and learning timings, process RSS and serialized graph size. It also reports two concurrent worker latencies for 100 and 500 files. The 2,000-file case is within core limits but exceeds the 1,000-file acquisition limit. It does not measure VS Code webview rendering, full HTTP acquisition, peak memory, or provide a performance baseline.
+
+Production acquisition currently returns 503 because there is no verified shared limiter. The development-only worker limits V8 heap and execution time and is cancellable; worker threads share a process and do not form a security boundary. Public deployment still requires a trusted distributed rate/queue budget and process/container CPU and memory isolation, with no direct ingress bypass. The worker entry file and its dependencies must be included by any chosen deployment packaging; serverless/standalone deployments are not yet validated.

@@ -9,3 +9,10 @@ coverage/
 .env.local
 .env.*.local
 .corepack/
+
+*.vsix
+playwright-report/
+test-results/
+.vscode-test/
+
+.vercel/

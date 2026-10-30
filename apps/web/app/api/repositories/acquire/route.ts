@@ -1,10 +1,18 @@
 import { acquireRepository, AcquisitionError } from '@codedna/github';
-import { analyzeSnapshot, analyzeUIFlows } from '@codedna/core';
+import {
+  AnalysisWorkerError,
+  runAnalysisWorker,
+} from '../../../../lib/analysis-worker';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 let active = 0;
+const BODY_TIMEOUT_MS = 5000;
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMIT = 30;
+const recentRequests: number[] = [];
+
 const headers = {
   'Cache-Control': 'no-store, max-age=0',
   'X-Content-Type-Options': 'nosniff',
@@ -25,6 +33,32 @@ const statuses: Record<string, number> = {
   upstream_error: 502,
 };
 export async function POST(request: Request) {
+  // There is no configured distributed limiter. Do not expose acquisition in production.
+  if (process.env.NODE_ENV === 'production')
+    return reply(
+      {
+        error: {
+          code: 'unavailable',
+          message:
+            'Repository acquisition is not configured for public deployment.',
+        },
+      },
+      503,
+    );
+  const now = Date.now();
+  while (recentRequests.length && recentRequests[0]! <= now - RATE_WINDOW_MS)
+    recentRequests.shift();
+  if (recentRequests.length >= RATE_LIMIT)
+    return reply(
+      {
+        error: {
+          code: 'rate_limited',
+          message: 'Too many requests. Try again shortly.',
+        },
+      },
+      429,
+    );
+  recentRequests.push(now);
   if (active >= 2)
     return reply(
       {
@@ -65,23 +99,50 @@ export async function POST(request: Request) {
     const reader = request.body.getReader();
     let size = 0;
     const chunks: Uint8Array[] = [];
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > 4096) {
-        await reader.cancel();
-        return reply(
-          {
-            error: {
-              code: 'invalid_request',
-              message: 'Request is too large.',
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('body_timeout')),
+        BODY_TIMEOUT_MS,
+      );
+    });
+    try {
+      while (true) {
+        const { value, done } = await Promise.race([reader.read(), timeout]);
+        if (done) break;
+        size += value.length;
+        if (size > 4096) {
+          void reader.cancel().catch(() => {});
+          return reply(
+            {
+              error: {
+                code: 'invalid_request',
+                message: 'Request is too large.',
+              },
             },
-          },
-          413,
-        );
+            413,
+          );
+        }
+        chunks.push(value);
       }
-      chunks.push(value);
+    } catch (error) {
+      void reader.cancel().catch(() => {});
+      if (error instanceof Error && error.message === 'body_timeout')
+        return reply(
+          { error: { code: 'timeout', message: 'Request body timed out.' } },
+          408,
+        );
+      return reply(
+        {
+          error: {
+            code: 'invalid_request',
+            message: 'Could not read request body.',
+          },
+        },
+        400,
+      );
+    } finally {
+      clearTimeout(timer);
     }
     let data: unknown;
     try {
@@ -113,10 +174,27 @@ export async function POST(request: Request) {
       ...(token ? { token } : {}),
       signal: request.signal,
     });
-    const analysis = analyzeSnapshot(result.snapshot);
-    const uiFlow = analyzeUIFlows(result.snapshot);
+    const { analysis, uiFlow } = await runAnalysisWorker(
+      result.snapshot,
+      request.signal,
+    );
     return reply({ ...result, analysis, uiFlow }, 200);
   } catch (error) {
+    if (error instanceof AnalysisWorkerError)
+      return reply(
+        {
+          error: {
+            code: error.code,
+            message:
+              error.code === 'timeout'
+                ? 'Analysis timed out.'
+                : error.code === 'cancelled'
+                  ? 'Analysis cancelled.'
+                  : 'Analysis failed.',
+          },
+        },
+        error.code === 'timeout' ? 504 : error.code === 'cancelled' ? 499 : 500,
+      );
     if (error instanceof AcquisitionError)
       return reply(
         {

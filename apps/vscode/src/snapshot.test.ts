@@ -1,6 +1,7 @@
 ﻿import { describe, expect, it } from 'vitest';
 import {
   acquireSnapshot,
+  acquireWithDeadline,
   normalizeRelative,
   supportedPath,
   type SnapshotProvider,
@@ -91,6 +92,18 @@ describe('local workspace snapshots', () => {
     );
     expect(a.snapshot.revision).not.toBe(b.snapshot.revision);
     expect(a.snapshot.id).not.toBe(other.snapshot.id);
+  });
+  it('times out even when a provider call never completes', async () => {
+    const stalled = provider({});
+    stalled.list = () => new Promise(() => {});
+    await expect(
+      acquireWithDeadline(stalled, 'repo', signal(), {
+        maxFiles: 1,
+        maxFileBytes: 1,
+        maxTotalBytes: 1,
+        maxTimeMs: 5,
+      }),
+    ).rejects.toThrow('timed out');
   });
   it('accepts at least 500 source files', async () => {
     const data: Record<string, string> = {};

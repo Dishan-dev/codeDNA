@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Explorer } from './explorer';
+import { LoadingState } from './loading-state';
 import {
   SESSION_KEY,
   learningSessionKey,
@@ -55,9 +56,10 @@ export function ExplorerSessionLoader({
     );
   if (!session)
     return (
-      <main className="workspace-state" role="status">
-        Loading repository session...
-      </main>
+      <LoadingState
+        message="Loading your repository"
+        detail="Restoring your Explorer session."
+      />
     );
   return (
     <Explorer

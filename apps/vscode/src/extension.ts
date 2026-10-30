@@ -8,15 +8,21 @@ import { analyzeImpact } from '@codedna/core/impact';
 import type { UIFlowAnalysis } from '@codedna/core';
 import type { AnalysisResult, LearningPlan } from '@codedna/shared';
 import {
-  acquireSnapshot,
+  acquireWithDeadline,
   DEFAULT_LIMITS,
   normalizeRelative,
   supportedPath,
   type LocalSnapshot,
   type SnapshotProvider,
 } from './snapshot.js';
-import { validMessage } from './protocol.js';
+import { validMessage, position } from './protocol.js';
 import { AnalysisCoordinator } from './coordinator.js';
+import { readWorkspaceFile } from './secure-read.js';
+import {
+  chooseFolder,
+  currentFileImpact,
+  ProgressStore,
+} from './workspace-logic.js';
 
 type Results = {
   result: AnalysisResult;
@@ -106,16 +112,12 @@ function providerFor(folder: vscode.WorkspaceFolder): SnapshotProvider {
     },
     async read(path, signal) {
       if (signal.aborted) throw cancelled();
-      const uri = uriFor(path);
-      const stat = await vscode.workspace.fs.stat(uri);
-      if (
-        (stat.type & vscode.FileType.SymbolicLink) !== 0 ||
-        stat.type !== vscode.FileType.File
-      )
-        throw new Error('Unsafe file');
-      if (stat.size > DEFAULT_LIMITS.maxFileBytes)
-        throw new Error('File too large');
-      return vscode.workspace.fs.readFile(uri);
+      return readWorkspaceFile(
+        folder.uri.fsPath,
+        path,
+        DEFAULT_LIMITS.maxFileBytes,
+        signal,
+      );
     },
   };
 }
@@ -149,9 +151,8 @@ function runWorker(
       else if (value) resolve(value);
     };
     worker.once('message', (value: Results | { error: string }) => {
-      'error' in value
-        ? finish(new Error(value.error))
-        : finish(undefined, value);
+      if ('error' in value) finish(new Error(value.error));
+      else finish(undefined, value);
     });
     worker.once('error', () => finish(new Error('Analysis worker failed')));
     worker.once('exit', (code) => {
@@ -169,15 +170,12 @@ export function activate(context: vscode.ExtensionContext) {
     impact: ReturnType<typeof analyzeImpact> | undefined;
   let attempt = 0;
   const folders = new Map<string, vscode.WorkspaceFolder>();
-  const progress = new Map<
-    string,
-    { step: number; completed: string[]; answers: Record<string, string> }
-  >();
+  const progress = new ProgressStore();
   const coordinator = new AnalysisCoordinator<LocalSnapshot, Results>(
     async (key, signal) => {
       const chosen = folders.get(key);
       if (!chosen) throw new Error('Workspace folder is unavailable');
-      return acquireSnapshot(providerFor(chosen), key, signal);
+      return acquireWithDeadline(providerFor(chosen), key, signal);
     },
     (snapshot, signal) => runWorker(context.extensionPath, snapshot, signal),
   );
@@ -252,34 +250,11 @@ export function activate(context: vscode.ExtensionContext) {
         }
         if (message.type === 'progress') {
           if (!current) return;
-          const plan = current.value.learning;
-          const stepIds = new Set(plan.steps.map((step) => step.id));
-          if (
-            message.step >= plan.steps.length ||
-            message.completed.some((id) => !stepIds.has(id))
-          )
-            return;
-          const questions = new Map(
-            plan.steps
-              .flatMap((step) => step.questions ?? [])
-              .map((question) => [question.id, question]),
+          progress.set(
+            current.snapshot.snapshot.id,
+            current.value.learning,
+            message,
           );
-          if (
-            Object.entries(message.answers).some(
-              ([id, choice]) =>
-                !questions.get(id)?.choices.some((item) => item.id === choice),
-            )
-          )
-            return;
-          const key = current.snapshot.snapshot.id;
-          progress.delete(key);
-          progress.set(key, {
-            step: message.step,
-            completed: [...new Set(message.completed)],
-            answers: message.answers,
-          });
-          while (progress.size > 3)
-            progress.delete(progress.keys().next().value!);
           publish();
           return;
         }
@@ -315,12 +290,21 @@ export function activate(context: vscode.ExtensionContext) {
               ...message.path.split('/'),
             );
             const document = await vscode.workspace.openTextDocument(uri);
+            const start = {
+              line: message.line ?? 1,
+              column: message.column ?? 1,
+            };
+            const requested = position({
+              path: message.path,
+              start,
+              end: start,
+            });
             const line = Math.min(
-              (message.line ?? 1) - 1,
+              requested.line,
               Math.max(0, document.lineCount - 1),
             );
             const column = Math.min(
-              (message.column ?? 1) - 1,
+              requested.column,
               document.lineAt(line).text.length,
             );
             await vscode.window.showTextDocument(document, {
@@ -346,33 +330,33 @@ export function activate(context: vscode.ExtensionContext) {
     );
   };
   const choose = async (preferActive = false) => {
-    if (!vscode.workspace.isTrusted)
-      throw new Error('Trust this workspace before running CodeDNA.');
     const available = (vscode.workspace.workspaceFolders ?? []).filter(
       (f) => f.uri.scheme === 'file',
     );
-    if (!available.length)
-      throw new Error('Open a local workspace folder first.');
     const active = vscode.window.activeTextEditor?.document.uri;
     const matched = active
       ? vscode.workspace.getWorkspaceFolder(active)
       : undefined;
-    if (
-      preferActive &&
-      matched &&
-      available.some((f) => f.uri.toString() === matched.uri.toString())
-    )
-      return matched;
-    if (available.length === 1) return available[0];
-    const picked = await vscode.window.showQuickPick(
-      available.map((f) => ({
-        label: f.name,
-        description: f.uri.fsPath,
-        folder: f,
-      })),
-      { placeHolder: 'Select the workspace folder to analyze' },
+    const currentMatch = available.find(
+      (folder) => folder.uri.toString() === matched?.uri.toString(),
     );
-    return picked?.folder;
+    return chooseFolder(
+      vscode.workspace.isTrusted,
+      available,
+      currentMatch,
+      preferActive,
+      async (folders) => {
+        const picked = await vscode.window.showQuickPick(
+          folders.map((folder) => ({
+            label: folder.name,
+            description: folder.uri.fsPath,
+            folder,
+          })),
+          { placeHolder: 'Select the workspace folder to analyze' },
+        );
+        return picked?.folder;
+      },
+    );
   };
   const runAnalysis = async (force = false, preferActive = false) => {
     const thisAttempt = ++attempt;
@@ -456,11 +440,13 @@ export function activate(context: vscode.ExtensionContext) {
       }
       selection = path;
       mode = 'Impact Analysis';
-      impact = analyzeImpact(current.value.result, path, {
-        uiFlowGraph: current.value.uiFlow.graph,
-        uiFlowDiagnostics: current.value.uiFlow.diagnostics,
-        snapshotComplete: current.snapshot.complete,
-      });
+      impact = currentFileImpact(
+        current.value.result,
+        current.snapshot.snapshot,
+        current.value.uiFlow,
+        current.snapshot.complete,
+        path,
+      );
       openPanel();
       publish();
     },

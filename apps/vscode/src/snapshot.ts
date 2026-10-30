@@ -170,3 +170,39 @@ export async function acquireSnapshot(
     diagnostics,
   };
 }
+
+/** Return promptly when acquisition exceeds its deadline, even if a provider call stalls. */
+export async function acquireWithDeadline(
+  provider: SnapshotProvider,
+  identity: string,
+  signal: AbortSignal,
+  limits: SnapshotLimits = DEFAULT_LIMITS,
+): Promise<LocalSnapshot> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const abort = () => controller.abort();
+  if (signal.aborted) throw new Error('Analysis cancelled');
+  signal.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, limits.maxTimeMs);
+  try {
+    return await new Promise<LocalSnapshot>((resolve, reject) => {
+      const cancelled = () =>
+        reject(
+          new Error(
+            timedOut ? 'Workspace acquisition timed out' : 'Analysis cancelled',
+          ),
+        );
+      controller.signal.addEventListener('abort', cancelled, { once: true });
+      acquireSnapshot(provider, identity, controller.signal, limits).then(
+        resolve,
+        reject,
+      );
+    });
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', abort);
+  }
+}
