@@ -42,6 +42,7 @@ import { ImpactWorkspace } from './impact-workspace';
 import { ArchitectureWorkspace } from './architecture-workspace';
 import { FileList } from './file-list';
 import { FileRelationships } from './file-relationships';
+import { filePracticeSuggestions } from '@/lib/practice-suggestions';
 import {
   LearningWorkspace,
   emptyLearningProgress,
@@ -176,6 +177,9 @@ export function Workspace({
     return (
       <ArchitectureWorkspace
         graph={state.result.dependencyGraph}
+        snapshot={state.snapshot}
+        uiFlow={uiFlow.graph}
+        complete={impactComplete}
         selectedId={selectedId}
         onSelectionChange={onSelectionChange}
       />
@@ -276,6 +280,10 @@ export function Explorer({
   const [left, setLeft] = useState(true);
   const [right, setRight] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sourceEvidence, setSourceEvidence] = useState<{
+    path: string;
+    line: number;
+  } | null>(null);
   const [fileHistory, setFileHistory] = useState<{
     ids: string[];
     index: number;
@@ -327,6 +335,7 @@ export function Explorer({
   );
   const onSelectionChange = useCallback((id: string | null) => {
     setSelectedId(id);
+    setSourceEvidence(null);
     if (id) {
       setFileHistory((current) => {
         if (current.ids[current.index] === id) return current;
@@ -339,6 +348,34 @@ export function Explorer({
       if (window.matchMedia('(max-width: 760px)').matches) setLeft(false);
     }
   }, []);
+  useEffect(() => {
+    if (sourceEvidence && selected?.path === sourceEvidence.path)
+      document
+        .getElementById('source-evidence-line')
+        ?.scrollIntoView({ block: 'nearest' });
+  }, [sourceEvidence, selected]);
+  const selectedScreenConvention =
+    selected && uiFlow.framework === 'next-app-router'
+      ? uiFlow.graph.nodes.find((node) => node.sourceFile === selected.path)
+      : undefined;
+  const selectedBoundaryConvention =
+    selected && uiFlow.framework === 'next-app-router'
+      ? uiFlow.graph.nodes
+          .flatMap((node) => node.boundaries ?? [])
+          .find((boundary) => boundary.path === selected.path)
+      : undefined;
+  const practiceSuggestions = useMemo(
+    () =>
+      result && selectedId
+        ? filePracticeSuggestions(
+            result.dependencyGraph,
+            result.diagnostics,
+            selectedId,
+            completeness.complete,
+          )
+        : [],
+    [result, selectedId, completeness.complete],
+  );
   const [query, setQuery] = useState('');
   useEffect(() => {
     if (window.matchMedia('(max-width: 760px)').matches) {
@@ -731,7 +768,30 @@ export function Explorer({
                     </Button>
                     {showScreenSource && (
                       <pre className="source-preview">
-                        <code>{selected.content}</code>
+                        <code>
+                          {sourceEvidence?.path === selected.path
+                            ? selected.content
+                                .split('\n')
+                                .map((line, index) => (
+                                  <span
+                                    key={index}
+                                    id={
+                                      index + 1 === sourceEvidence.line
+                                        ? 'source-evidence-line'
+                                        : undefined
+                                    }
+                                    className={
+                                      index + 1 === sourceEvidence.line
+                                        ? 'source-line-highlight'
+                                        : undefined
+                                    }
+                                  >
+                                    {line}
+                                    {'\n'}
+                                  </span>
+                                ))
+                            : selected.content}
+                        </code>
                       </pre>
                     )}
                   </>
@@ -803,12 +863,75 @@ export function Explorer({
                     <small>{selected.path}</small>
                   </div>
                 </div>
+                {mode === 'Architecture' && (
+                  <p className="relationship-summary">
+                    {selected.path.split('/').at(-1)} is a source file located
+                    in{' '}
+                    {selected.path.includes('/')
+                      ? selected.path.slice(0, selected.path.lastIndexOf('/'))
+                      : 'the repository root'}
+                    . Select a relationship below to follow its source evidence.
+                  </p>
+                )}
+                {mode === 'Architecture' &&
+                  (selectedScreenConvention || selectedBoundaryConvention) && (
+                    <div className="file-convention">
+                      <strong>Next.js App Router convention</strong>
+                      <p>
+                        {selectedScreenConvention
+                          ? `This file was detected as a page for ${selectedScreenConvention.routePath ?? 'a route'}.`
+                          : `This file was detected as a ${selectedBoundaryConvention?.kind} boundary associated with a route.`}{' '}
+                        This describes a framework convention, not confirmed
+                        runtime behavior.
+                      </p>
+                    </div>
+                  )}
                 {mode === 'Architecture' && result && selectedId && (
                   <FileRelationships
                     graph={result.dependencyGraph}
                     selectedId={selectedId}
                     onSelect={onSelectionChange}
+                    onEvidence={(path, line) => {
+                      onSelectionChange(`file:${path}`);
+                      setSourceEvidence({ path, line });
+                    }}
                   />
+                )}
+                {mode === 'Architecture' && (
+                  <div className="practice-suggestions">
+                    <h3>Ideas to review</h3>
+                    <p>
+                      These are evidence-based suggestions, not confirmed
+                      problems or a code quality score.
+                    </p>
+                    {practiceSuggestions.length ? (
+                      practiceSuggestions.map((item) => (
+                        <section key={item.id}>
+                          <strong>{item.title}</strong>
+                          <p>{item.explanation}</p>
+                          {item.location && (
+                            <button
+                              className="relationship-evidence"
+                              type="button"
+                              onClick={() => {
+                                onSelectionChange(
+                                  `file:${item.location!.path}`,
+                                );
+                                setSourceEvidence(item.location!);
+                              }}
+                            >
+                              View source line {item.location.line}
+                            </button>
+                          )}
+                        </section>
+                      ))
+                    ) : (
+                      <p>
+                        No suggestions detected for this file with the available
+                        analysis.
+                      </p>
+                    )}
+                  </div>
                 )}
                 <div className="inspector-rule" />
                 <div className="inspector-label">
@@ -866,4 +989,3 @@ export function Explorer({
     </div>
   );
 }
-

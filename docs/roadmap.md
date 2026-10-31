@@ -9,3 +9,5 @@
 7. **Future work:** broader language and framework coverage, incremental analysis, and performance and compatibility hardening.
 
 Later phases are directional, not a commitment to a specific parser or service.
+
+8. **Experimental 3D architecture:** optional, bounded directory-cluster view of existing static dependency evidence. Future refinement may add smoother camera transitions and browser/device validation; guided tours and 3D impact analysis remain future work.

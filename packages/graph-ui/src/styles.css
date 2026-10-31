@@ -301,3 +301,203 @@
 .dna-screen.dna-node--connected {
   border-color: #6c9fae;
 }
+.dna-3d-root {
+  position: relative;
+  height: 100%;
+  min-height: 360px;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    #222353 0%,
+    #101a31 38%,
+    #080c17 85%
+  );
+}
+.dna-3d-toolbar {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: #b6c6e0;
+  font-size: 11px;
+}
+.dna-3d-toolbar button,
+.dna-3d-access button,
+.dna-3d-evidence button {
+  border: 1px solid #455573;
+  border-radius: 5px;
+  background: #172337;
+  color: #dbe6ff;
+  padding: 6px 9px;
+}
+.dna-3d-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px;
+  border: 1px solid #4f6c9c;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #192b45f2, #101626f2);
+  box-shadow:
+    0 6px 24px #0008,
+    0 0 18px #5088ff20;
+  color: #eaf2ff;
+  white-space: nowrap;
+  font: 11px system-ui;
+}
+.dna-3d-label--folder {
+  border-color: #7772ba;
+  box-shadow:
+    0 6px 24px #0008,
+    0 0 20px #8176ff30;
+}
+.dna-3d-label--active {
+  border-color: #98edff;
+  box-shadow: 0 0 24px #62cfff60;
+}
+.dna-3d-label-type {
+  color: #94a8cf;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.dna-3d-label small {
+  color: #9dadd0;
+  font-size: 9px;
+}
+.dna-3d-toolbar > span {
+  color: #e5eaff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.dna-3d-toolbar > span small {
+  display: block;
+  color: #91a5c7;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: normal;
+  margin-top: 4px;
+}
+.dna-3d-toolbar button:hover,
+.dna-3d-access button:hover,
+.dna-3d-edge-list button:hover {
+  border-color: #86acff;
+  background: #263b5c;
+}
+.dna-3d-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  color: #9aaac3;
+  font-size: 10px;
+  pointer-events: none;
+}
+.dna-3d-access {
+  position: absolute;
+  top: 58px;
+  left: 12px;
+  z-index: 2;
+  max-height: 40%;
+  max-width: 280px;
+  overflow: auto;
+  background: #111a2bef;
+  color: #dbe6ff;
+  border: 1px solid #354764;
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 8px;
+}
+.dna-3d-access button {
+  display: block;
+  margin: 4px 0;
+  text-align: left;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+.dna-3d-evidence {
+  position: absolute;
+  right: 12px;
+  bottom: 35px;
+  max-width: 340px;
+  max-height: 40%;
+  overflow: auto;
+  background: #111a2bf2;
+  color: #dbe6ff;
+  padding: 12px;
+  border: 1px solid #455573;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.dna-3d-evidence button {
+  float: right;
+}
+.dna-3d-evidence li {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+.dna-3d-fallback {
+  padding: 32px;
+  color: #dbe6ff;
+}
+.dna-3d-edge-list {
+  position: absolute;
+  right: 12px;
+  top: 58px;
+  z-index: 2;
+  max-width: 280px;
+  max-height: 40%;
+  overflow: auto;
+  background: #111a2bef;
+  color: #dbe6ff;
+  border: 1px solid #354764;
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 8px;
+}
+.dna-3d-edge-list button {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+  border: 1px solid #455573;
+  border-radius: 5px;
+  background: #172337;
+  color: #dbe6ff;
+  padding: 6px 9px;
+}
+.dna-edge-explanation {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 5;
+  max-width: 320px;
+  padding: 13px;
+  border: 1px solid #496287;
+  border-radius: 8px;
+  background: #121d2ef5;
+  color: #dce8ff;
+  font-size: 11px;
+  box-shadow: 0 8px 24px #0007;
+}
+.dna-edge-explanation strong {
+  color: #e9f2ff;
+}
+.dna-edge-explanation p {
+  line-height: 1.55;
+  color: #b4c8e2;
+}
+.dna-edge-explanation small {
+  color: #91a9c6;
+}
+.dna-edge-explanation button {
+  float: right;
+  color: #dce8ff;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+}

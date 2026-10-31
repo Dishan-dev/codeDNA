@@ -11,7 +11,11 @@ import {
   useReactFlow,
   type NodeProps,
 } from '@xyflow/react';
-import type { DependencyGraph } from '@codedna/shared';
+import {
+  describeDependency,
+  type DependencyEdge,
+  type DependencyGraph,
+} from '@codedna/shared';
 import {
   adaptGraph,
   neighborhood,
@@ -82,6 +86,7 @@ function MapCanvas({
     'loading',
   );
   const [reset, setReset] = useState(0);
+  const [selectedEdge, setSelectedEdge] = useState<DependencyEdge | null>(null);
   const { fitView, setCenter } = useReactFlow();
   const initialized = useRef(false);
   useEffect(() => {
@@ -205,7 +210,13 @@ function MapCanvas({
         onInit={() => {
           initialized.current = true;
         }}
-        onNodeClick={(_, node) => select(node.id)}
+        onNodeClick={(_, node) => {
+          setSelectedEdge(null);
+          select(node.id);
+        }}
+        onEdgeClick={(_, edge) => {
+          if (edge.data?.source) setSelectedEdge(edge.data.source);
+        }}
         onKeyDown={(event) => {
           if (
             (event.key === 'Enter' || event.key === ' ') &&
@@ -220,7 +231,10 @@ function MapCanvas({
             }
           }
         }}
-        onPaneClick={() => select(null)}
+        onPaneClick={() => {
+          setSelectedEdge(null);
+          select(null);
+        }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable
@@ -237,6 +251,38 @@ function MapCanvas({
         />
         <Controls showInteractive={false} position="bottom-right" />
       </ReactFlow>
+      {selectedEdge && (
+        <div
+          className="dna-edge-explanation"
+          role="region"
+          aria-label="Dependency explanation"
+        >
+          <button
+            type="button"
+            onClick={() => setSelectedEdge(null)}
+            aria-label="Close dependency explanation"
+          >
+            ?
+          </button>
+          <strong>About this connection</strong>
+          <p>
+            {describeDependency(
+              selectedEdge,
+              graph.nodes.find((node) => node.id === selectedEdge.sourceId)
+                ?.label ?? selectedEdge.sourceId,
+              graph.nodes.find((node) => node.id === selectedEdge.targetId)
+                ?.label ?? selectedEdge.targetId,
+            )}
+          </p>
+          {selectedEdge.location && (
+            <small>
+              Source: {selectedEdge.location.path}:
+              {selectedEdge.location.start.line}:
+              {selectedEdge.location.start.column}
+            </small>
+          )}
+        </div>
+      )}
       {status === 'loading' && (
         <div className="dna-graph-loading" role="status">
           <span className="dna-spinner" />

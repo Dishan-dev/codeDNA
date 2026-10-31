@@ -218,3 +218,5 @@ export interface LearningPlan {
   steps: LearningStep[];
   warnings: string[];
 }
+
+export { describeDependency } from './explanations.js';
