@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { RepositorySnapshot, SourceFile } from '@codedna/shared';
+import { readArchive } from './archive.js';
 
 export interface RepositoryIdentity {
   owner: string;
@@ -38,6 +39,7 @@ export interface AcquisitionOptions {
   signal?: AbortSignal;
   fetch?: typeof fetch;
   limits?: Partial<AcquisitionLimits>;
+  strategy?: 'blobs' | 'archive';
 }
 export interface AcquisitionLimits {
   maxFiles: number;
@@ -318,8 +320,53 @@ export async function acquireRepository(
       entries.push({ path, sha: sha(entry.sha), size });
     }
     entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-    if (entries.length + requests > limits.maxRequests)
+    const blobSizes = new Map<string, number>();
+    for (const entry of entries) {
+      const size = blobSizes.get(entry.sha);
+      if (size !== undefined && size !== entry.size)
+        fail('invalid_response', 'GitHub returned inconsistent blob sizes.');
+      blobSizes.set(entry.sha, entry.size);
+    }
+    if (
+      (options.strategy === 'archive' ? 1 : blobSizes.size) + requests >
+      limits.maxRequests
+    )
       fail('limit_exceeded', 'Repository exceeds the GitHub request limit.');
+    let archive: Map<string, Uint8Array> | undefined;
+    if (options.strategy === 'archive') {
+      if (controller.signal.aborted)
+        fail(
+          timedOut ? 'timeout' : 'cancelled',
+          timedOut
+            ? 'Repository acquisition timed out.'
+            : 'Repository acquisition was cancelled.',
+        );
+      requests++;
+      let response: Response;
+      try {
+        response = await fetcher(
+          `https://codeload.github.com/${repository.owner}/${repository.repo}/tar.gz/${commitSha}`,
+          { signal: controller.signal, redirect: 'manual', cache: 'no-store' },
+        );
+        if (!response.ok)
+          fail(
+            'upstream_error',
+            'GitHub could not download the repository archive.',
+          );
+        archive = await readArchive(response, entries, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted)
+          fail(
+            timedOut ? 'timeout' : 'cancelled',
+            timedOut
+              ? 'Repository acquisition timed out.'
+              : 'Repository acquisition was cancelled.',
+          );
+        if (error instanceof AcquisitionError) throw error;
+        fail('upstream_error', 'Could not download the repository archive.');
+      }
+    }
+    const blobs = new Map<string, Promise<Record<string, unknown>>>();
     const results: (
       | { file: SourceFile }
       | { binary: string }
@@ -331,34 +378,45 @@ export async function acquireRepository(
         const index = cursor++;
         const entry = entries[index];
         if (!entry) return;
-        const blob = await request(
-          `/git/blobs/${entry.sha}`,
-          Math.ceil(limits.maxFileBytes * 1.5) + 65536,
-        );
-        if (
-          sha(blob.sha) !== entry.sha ||
-          blob.encoding !== 'base64' ||
-          typeof blob.content !== 'string' ||
-          blob.size !== entry.size
-        )
-          fail('invalid_response', 'GitHub returned an invalid file blob.');
-        const encoded = (blob.content as string).replace(/\n/g, '');
-        if (
-          !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-            encoded,
+        let bytes: Buffer;
+        if (archive) {
+          bytes = Buffer.from(archive.get(entry.path)!);
+        } else {
+          let pending = blobs.get(entry.sha);
+          if (!pending) {
+            pending = request(
+              `/git/blobs/${entry.sha}`,
+              Math.ceil(limits.maxFileBytes * 1.5) + 65536,
+            );
+            blobs.set(entry.sha, pending);
+          }
+          const blob = await pending;
+          if (
+            sha(blob.sha) !== entry.sha ||
+            blob.encoding !== 'base64' ||
+            typeof blob.content !== 'string' ||
+            blob.size !== entry.size
           )
-        )
-          fail('invalid_response', 'GitHub returned invalid blob content.');
-        const bytes = Buffer.from(encoded, 'base64');
-        const calculated = createHash('sha1')
-          .update(`blob ${bytes.length}\0`)
-          .update(bytes)
-          .digest('hex');
-        if (bytes.length !== entry.size || calculated !== entry.sha)
-          fail(
-            'invalid_response',
-            'GitHub returned a blob that does not match its tree.',
-          );
+            fail('invalid_response', 'GitHub returned an invalid file blob.');
+          const encoded = (blob.content as string).replace(/\n/g, '');
+          if (
+            !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+              encoded,
+            )
+          )
+            fail('invalid_response', 'GitHub returned invalid blob content.');
+          const decoded = Buffer.from(encoded, 'base64');
+          const calculated = createHash('sha1')
+            .update(`blob ${decoded.length}\0`)
+            .update(decoded)
+            .digest('hex');
+          if (decoded.length !== entry.size || calculated !== entry.sha)
+            fail(
+              'invalid_response',
+              'GitHub returned a blob that does not match its tree.',
+            );
+          bytes = decoded;
+        }
         let content: string;
         try {
           content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);

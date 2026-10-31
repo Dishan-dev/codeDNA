@@ -20,6 +20,7 @@ export {
 export type {
   UIFlowAnalysis,
   UIFlowFrameworkAdapter,
+  UIFlowAnalysisOptions,
   UIFlowContext,
 } from './ui-flow/index.js';
 export { analyzeImpact, createImpactAnalyzer } from './impact.js';

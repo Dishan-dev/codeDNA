@@ -29,11 +29,14 @@ import '@xyflow/react/dist/style.css';
 const FileNode = memo(function FileNode({ data }: NodeProps<MapNode>) {
   const name = data.source.label.split('/').at(-1) ?? data.source.label;
   const external = data.source.kind === 'external';
-  const extension = external
-    ? 'PACKAGE'
-    : name.includes('.')
-      ? name.split('.').at(-1)?.toUpperCase()
-      : 'FILE';
+  const group = data.source.id.startsWith('group:');
+  const extension = group
+    ? 'GROUP'
+    : external
+      ? 'PACKAGE'
+      : name.includes('.')
+        ? name.split('.').at(-1)?.toUpperCase()
+        : 'FILE';
   return (
     <div
       className={`dna-node dna-node--${data.emphasis} ${external ? 'dna-node--external' : ''}`}
@@ -41,7 +44,7 @@ const FileNode = memo(function FileNode({ data }: NodeProps<MapNode>) {
     >
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <span className="dna-node-icon" aria-hidden="true">
-        {external ? 'pkg' : '{ }'}
+        {group ? 'grp' : external ? 'pkg' : '{ }'}
       </span>
       <div className="dna-node-copy">
         <strong>{name}</strong>

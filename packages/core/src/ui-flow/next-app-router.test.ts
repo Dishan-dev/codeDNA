@@ -30,6 +30,76 @@ const fixture = snapshot({
   'components/Nav.tsx': `import Link from 'next/link'; export default function Nav(){return <Link href="https://example.org">External</Link>}`,
 });
 describe('Next.js App Router UI flow', () => {
+  it('detects a single nested monorepo app root and preserves source paths', () => {
+    const result = analyzeUIFlows(
+      snapshot({
+        'apps/web/app/page.tsx': `import Link from 'next/link'; export default function Home(){return <Link href="/about">About</Link>}`,
+        'apps/web/app/about/page.tsx':
+          'export default function About(){return null}',
+      }),
+    );
+    expect(result.graph.nodes.map((node) => node.routePath).sort()).toEqual([
+      '/',
+      '/about',
+    ]);
+    expect(result.graph.edges).toHaveLength(1);
+    expect(
+      result.graph.nodes.some(
+        (node) => node.sourceFile === 'apps/web/app/page.tsx',
+      ),
+    ).toBe(true);
+  });
+  it('reports ambiguous nested app roots instead of merging applications', () => {
+    const result = analyzeUIFlows(
+      snapshot({
+        'apps/one/app/page.tsx': 'export default function Page(){return null}',
+        'apps/two/app/page.tsx': 'export default function Page(){return null}',
+      }),
+    );
+    expect(result.graph.nodes).toHaveLength(0);
+    expect(
+      result.diagnostics.some((d) => d.code === 'ui-app-root-ambiguous'),
+    ).toBe(true);
+  });
+  it('discovers arbitrary project nesting and analyzes an explicitly selected app', () => {
+    const data = snapshot({
+      'products/team/portal/src/app/page.tsx':
+        'export default function Page(){return null}',
+      'services/console/app/page.tsx':
+        'export default function Page(){return null}',
+    });
+    const ambiguous = analyzeUIFlows(data);
+    expect(ambiguous.graph.nodes).toHaveLength(0);
+    expect(
+      ambiguous.diagnostics.some((d) => d.code === 'ui-app-root-ambiguous'),
+    ).toBe(true);
+    const selected = analyzeUIFlows(data, {
+      appRoot: 'products/team/portal/src/app',
+    });
+    expect(selected.graph.nodes.map((n) => n.sourceFile)).toEqual([
+      'products/team/portal/src/app/page.tsx',
+    ]);
+    const invalid = analyzeUIFlows(data, { appRoot: '../outside' });
+    expect(
+      invalid.diagnostics.some((d) => d.code === 'ui-app-root-invalid'),
+    ).toBe(true);
+    expect(
+      analyzeUIFlows(data, { appRoot: 'products/team/portal/src/app' }),
+    ).toEqual(selected);
+  });
+  it('does not silently ignore a nested app when a root app also exists', () => {
+    const result = analyzeUIFlows(
+      snapshot({
+        'app/page.tsx': 'export default function Page(){return null}',
+        'other/site/app/page.tsx':
+          'export default function Page(){return null}',
+      }),
+    );
+    expect(result.graph.nodes).toHaveLength(0);
+    expect(
+      result.diagnostics.some((d) => d.code === 'ui-app-root-ambiguous'),
+    ).toBe(true);
+  });
   it('discovers routes, groups, dynamic segments, boundaries and direct navigation', () => {
     const { graph, diagnostics } = analyzeUIFlows(fixture);
     expect(graph.nodes.map((n) => n.routePath).sort()).toEqual([

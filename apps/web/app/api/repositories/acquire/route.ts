@@ -173,6 +173,7 @@ export async function POST(request: Request) {
     const result = await acquireRepository((data as { url: string }).url, {
       ...(token ? { token } : {}),
       signal: request.signal,
+      strategy: 'archive',
     });
     const { analysis, uiFlow } = await runAnalysisWorker(
       result.snapshot,

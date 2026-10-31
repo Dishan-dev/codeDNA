@@ -8,6 +8,7 @@ import type ts from 'typescript';
 import { validateSnapshot, type AnalysisOptions } from '../validation.js';
 import { parseSource } from '../source.js';
 import { nextAppRouterAdapter } from './next-app-router.js';
+import { discoverNextAppRoots } from './app-roots.js';
 import { hasReactRouterEvidence, reactRouterAdapter } from './react-router.js';
 import {
   hasReactNavigationEvidence,
@@ -27,6 +28,7 @@ export interface UIFlowContext {
   snapshot: RepositorySnapshot;
   files: ReadonlyMap<string, SourceFile>;
   parse(path: string): ts.SourceFile | undefined;
+  appRoot?: string;
 }
 export interface UIFlowAnalysis {
   framework?: string;
@@ -37,10 +39,14 @@ export interface UIFlowFrameworkAdapter {
   readonly id: string;
   analyze(context: UIFlowContext): UIFlowAnalysis;
 }
+export interface UIFlowAnalysisOptions extends AnalysisOptions {
+  /** Select an exact discovered Next.js app directory when a snapshot contains multiple apps. */
+  appRoot?: string;
+}
 /** Analyze framework navigation without altering the existing dependency-analysis API. */
 export function analyzeUIFlows(
   snapshot: RepositorySnapshot,
-  options: AnalysisOptions = {},
+  options: UIFlowAnalysisOptions = {},
   adapter?: UIFlowFrameworkAdapter,
 ): UIFlowAnalysis {
   const checked = validateSnapshot(snapshot, options);
@@ -49,6 +55,7 @@ export function analyzeUIFlows(
   const context: UIFlowContext = {
     snapshot: checked,
     files,
+    ...(options.appRoot !== undefined ? { appRoot: options.appRoot } : {}),
     parse(path) {
       const source = files.get(path);
       if (!source) return undefined;
@@ -64,11 +71,12 @@ export function analyzeUIFlows(
   const reactEvidence = hasReactRouterEvidence(context);
   const expoEvidence = hasExpoRouterEvidence(context);
   const navigationEvidence = hasReactNavigationEvidence(context);
-  const hasNextPages = [...files.keys()].some((path) =>
-    /^(?:src\/)?app\/(?:.*\/)?page\.(?:ts|tsx|js|jsx)$/.test(path),
-  );
+  const hasNextPages = discoverNextAppRoots(files.keys()).length > 0;
   const nextEvidence =
-    hasNextPages && (!expoEvidence || hasNextSourceEvidence(context));
+    hasNextPages &&
+    (options.appRoot !== undefined ||
+      !expoEvidence ||
+      hasNextSourceEvidence(context));
   const selected = nextEvidence
     ? nextAppRouterAdapter
     : expoEvidence

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import {
   useCallback,
   useEffect,
@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { generateLearningPlan } from '@codedna/core/learning';
-import { ArchitectureMap, UIFlowMap } from '@codedna/graph-ui';
+import { UIFlowMap } from '@codedna/graph-ui';
 import type { UIFlowAnalysis } from '@codedna/core';
 import { screenForFile } from '@/lib/explorer-session';
 import type { ExplorerSession } from '@/lib/explorer-session';
@@ -20,7 +20,6 @@ import {
   ChevronRight,
   CircleHelp,
   FileCode2,
-  Folder,
   GitBranch,
   LayoutDashboard,
   PanelLeftClose,
@@ -36,11 +35,13 @@ import {
 import type {
   AnalysisResult,
   RepositorySnapshot,
-  SourceFile,
   LearningPlan,
 } from '@codedna/shared';
 import { Brand } from './brand';
 import { ImpactWorkspace } from './impact-workspace';
+import { ArchitectureWorkspace } from './architecture-workspace';
+import { FileList } from './file-list';
+import { FileRelationships } from './file-relationships';
 import {
   LearningWorkspace,
   emptyLearningProgress,
@@ -173,7 +174,7 @@ export function Workspace({
     );
   if (mode === 'Architecture' && state.result)
     return (
-      <ArchitectureMap
+      <ArchitectureWorkspace
         graph={state.result.dependencyGraph}
         selectedId={selectedId}
         onSelectionChange={onSelectionChange}
@@ -243,47 +244,6 @@ export function Workspace({
     </div>
   );
 }
-function FileList({
-  files,
-  selected,
-  onSelect,
-  query,
-  repositoryName,
-}: {
-  files: SourceFile[];
-  repositoryName: string;
-  selected: string | null;
-  onSelect: (file: SourceFile) => void;
-  query: string;
-}) {
-  const matches = files.filter((file) =>
-    file.path.toLowerCase().includes(query.toLowerCase()),
-  );
-  return (
-    <div className="file-list">
-      <div className="tree-root">
-        <ChevronDown size={14} />
-        <Folder size={15} />
-        <span>{repositoryName}</span>
-      </div>
-      {matches.length ? (
-        matches.map((file) => (
-          <button
-            key={file.id}
-            className={`file-item ${selected === file.path ? 'selected' : ''}`}
-            onClick={() => onSelect(file)}
-            aria-pressed={selected === file.path}
-          >
-            <FileCode2 size={15} />
-            <span>{file.path}</span>
-          </button>
-        ))
-      ) : (
-        <p className="no-files">No files match your search.</p>
-      )}
-    </div>
-  );
-}
 export function Explorer({
   snapshot,
   result,
@@ -316,6 +276,10 @@ export function Explorer({
   const [left, setLeft] = useState(true);
   const [right, setRight] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fileHistory, setFileHistory] = useState<{
+    ids: string[];
+    index: number;
+  }>({ ids: [], index: -1 });
   const [uiSelectedId, setUISelectedId] = useState<string | null>(null);
   const [impactInspection, setImpactInspection] = useState<{
     root: string;
@@ -364,6 +328,13 @@ export function Explorer({
   const onSelectionChange = useCallback((id: string | null) => {
     setSelectedId(id);
     if (id) {
+      setFileHistory((current) => {
+        if (current.ids[current.index] === id) return current;
+        const ids = [...current.ids.slice(0, current.index + 1), id].slice(
+          -100,
+        );
+        return { ids, index: ids.length - 1 };
+      });
       setRight(true);
       if (window.matchMedia('(max-width: 760px)').matches) setLeft(false);
     }
@@ -495,6 +466,35 @@ export function Explorer({
             <div className="panel-section-label">
               REPOSITORY <ChevronDown size={13} aria-hidden="true" />
             </div>
+            {mode === 'Architecture' && (
+              <div
+                className="file-history"
+                aria-label="File navigation history"
+              >
+                <button
+                  type="button"
+                  disabled={fileHistory.index <= 0}
+                  onClick={() => {
+                    const index = fileHistory.index - 1;
+                    setFileHistory({ ...fileHistory, index });
+                    setSelectedId(fileHistory.ids[index] ?? null);
+                  }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  disabled={fileHistory.index >= fileHistory.ids.length - 1}
+                  onClick={() => {
+                    const index = fileHistory.index + 1;
+                    setFileHistory({ ...fileHistory, index });
+                    setSelectedId(fileHistory.ids[index] ?? null);
+                  }}
+                >
+                  Forward
+                </button>
+              </div>
+            )}
             <FileList
               files={snapshot.files}
               selected={selected?.path ?? null}
@@ -566,6 +566,34 @@ export function Explorer({
                     {d.path}: {d.message}
                   </li>
                 ))}
+              </ul>
+            </details>
+          )}
+          {mode === 'UI Flow' && (
+            <details className="analysis-diagnostics">
+              <summary>UI Flow support and limitations</summary>
+              <ul>
+                <li>
+                  Supports statically detectable routes and navigation in
+                  Next.js App Router, React Router, Expo Router and React
+                  Navigation.
+                </li>
+                <li>
+                  Analyzes TypeScript and JavaScript source files only. Other
+                  frameworks and routing patterns may not be detected.
+                </li>
+                <li>
+                  Dynamic or ambiguous navigation can remain unresolved;
+                  detected connections do not prove runtime behavior.
+                </li>
+                <li>
+                  Imports use the public repository?s default branch. Partial
+                  snapshots can omit routes and connections.
+                </li>
+                <li>
+                  Multiple Next.js application roots require selection through
+                  the analysis API; the Explorer cannot select one yet.
+                </li>
               </ul>
             </details>
           )}
@@ -775,6 +803,13 @@ export function Explorer({
                     <small>{selected.path}</small>
                   </div>
                 </div>
+                {mode === 'Architecture' && result && selectedId && (
+                  <FileRelationships
+                    graph={result.dependencyGraph}
+                    selectedId={selectedId}
+                    onSelect={onSelectionChange}
+                  />
+                )}
                 <div className="inspector-rule" />
                 <div className="inspector-label">
                   SOURCE{' '}
@@ -831,3 +866,4 @@ export function Explorer({
     </div>
   );
 }
+

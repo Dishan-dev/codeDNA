@@ -19,9 +19,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@codedna/shared": "workspace:*"
+    "@codedna/shared": "workspace:*",
+    "tar-stream": "3.1.7"
   },
   "devDependencies": {
-    "@codedna/core": "workspace:*"
+    "@codedna/core": "workspace:*",
+    "@types/tar-stream": "3.1.4"
   }
 }

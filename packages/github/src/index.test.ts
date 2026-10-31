@@ -30,6 +30,8 @@ function setup(
     mismatch?: boolean;
     lfs?: boolean;
     links?: boolean;
+    duplicate?: boolean;
+    inconsistent?: boolean;
   } = {},
 ) {
   const a = blob(`import './util';`);
@@ -67,6 +69,17 @@ function setup(
       sha: a.sha,
       size: a.size,
     },
+    ...(config.duplicate || config.inconsistent
+      ? [
+          {
+            path: 'src/copy.ts',
+            type: 'blob',
+            mode: '100644',
+            sha: b.sha,
+            size: config.inconsistent ? b.size + 1 : b.size,
+          },
+        ]
+      : []),
     ...(config.lfs
       ? [
           {
@@ -191,6 +204,31 @@ describe('GitHub acquisition', () => {
             'Bearer secret',
       ),
     ).toBe(true);
+  });
+  it('fetches identical blobs once while preserving every source path', async () => {
+    const { fetcher, calls } = setup({ duplicate: true });
+    const result = await acquireRepository('https://github.com/test/repo', {
+      fetch: fetcher,
+      limits: { maxRequests: 5 },
+    });
+    expect(result.snapshot.files.map((file) => file.path)).toEqual([
+      'src/copy.ts',
+      'src/main.ts',
+      'src/util.ts',
+    ]);
+    expect(
+      calls.filter((call) => call.url.includes('/git/blobs/')),
+    ).toHaveLength(2);
+    expect(result.snapshot.files[0]?.content).toBe(
+      result.snapshot.files[2]?.content,
+    );
+  });
+  it('rejects inconsistent sizes for the same blob before downloading content', async () => {
+    const { fetcher, calls } = setup({ inconsistent: true });
+    await expect(
+      acquireRepository('https://github.com/test/repo', { fetch: fetcher }),
+    ).rejects.toMatchObject({ code: 'invalid_response' });
+    expect(calls).toHaveLength(3);
   });
   it('reports binary files as explicitly partial', async () => {
     const { fetcher } = setup({ binary: true });

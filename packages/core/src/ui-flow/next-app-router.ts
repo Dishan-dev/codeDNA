@@ -9,6 +9,7 @@ import type {
   UINavigationKind,
 } from '@codedna/shared';
 import { sourceLocation } from '../source.js';
+import { discoverNextAppRoots } from './app-roots.js';
 import type {
   UIFlowContext,
   UIFlowFrameworkAdapter,
@@ -381,6 +382,8 @@ export const nextAppRouterAdapter: UIFlowFrameworkAdapter = {
       return source;
     };
     const all = [...context.files.keys()].filter((path) => isCode.test(path));
+    const candidates = discoverNextAppRoots(all);
+    // Preserve root-level app/src-app precedence for existing single-app snapshots.
     const rootApp = all.some((path) => path.startsWith('app/'));
     const srcApp = all.some((path) => path.startsWith('src/app/'));
     if (rootApp && srcApp)
@@ -388,7 +391,31 @@ export const nextAppRouterAdapter: UIFlowFrameworkAdapter = {
         'ui-app-root-ambiguous',
         'Both app/ and src/app/ are present; only app/ is analyzed.',
       );
-    const root = rootApp ? 'app' : srcApp ? 'src/app' : undefined;
+    let root: string | undefined;
+    if (context.appRoot !== undefined) {
+      if (candidates.includes(context.appRoot)) root = context.appRoot;
+      else
+        report(
+          'ui-app-root-invalid',
+          'The selected App Router root was not found in the snapshot.',
+        );
+    } else if (
+      candidates.length > 1 &&
+      !(
+        rootApp &&
+        srcApp &&
+        candidates.every(
+          (candidate) => candidate === 'app' || candidate === 'src/app',
+        )
+      )
+    ) {
+      report(
+        'ui-app-root-ambiguous',
+        `Multiple App Router roots were found: ${candidates.join(', ')}. Select an application root to analyze.`,
+      );
+    } else {
+      root = rootApp ? 'app' : srcApp ? 'src/app' : candidates[0];
+    }
     if (!root)
       return {
         graph: {
@@ -397,7 +424,7 @@ export const nextAppRouterAdapter: UIFlowFrameworkAdapter = {
           edges: [],
           navigationEvents: [],
         },
-        diagnostics: [],
+        diagnostics,
       };
     const routes: Route[] = [];
     for (const path of all.filter(

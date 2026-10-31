@@ -50,6 +50,14 @@ export function adaptGraph(graph: DependencyGraph): AdaptedGraph {
       source: source.sourceId,
       target: source.targetId,
       type: 'smoothstep',
+      ...(source.id.startsWith('group-edge:')
+        ? {
+            label: source.specifier,
+            labelStyle: { fill: '#d5def2', fontSize: 10 },
+            labelBgStyle: { fill: '#161d2a' },
+            labelBgPadding: [5, 3] as [number, number],
+          }
+        : {}),
       data: { source },
       markerEnd: { type: 'arrowclosed' as const },
       ariaLabel: `${source.kind ?? 'dependency'} ${source.specifier ?? ''}`,

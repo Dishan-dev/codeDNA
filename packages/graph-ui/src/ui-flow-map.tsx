@@ -170,8 +170,8 @@ function Canvas({
         </strong>
         <span>
           {frameworkDetected
-            ? 'No supported routes could be mapped in this snapshot.'
-            : 'UI Flow supports Next.js App Router, Expo Router, React Router and React Navigation projects.'}
+            ? 'No supported routes could be mapped in this snapshot. Dynamic or unsupported patterns and missing files may limit detection.'
+            : 'UI Flow detects supported routing patterns in Next.js App Router, Expo Router, React Router and React Navigation TypeScript or JavaScript projects.'}
         </span>
       </div>
     );
