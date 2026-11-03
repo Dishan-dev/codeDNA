@@ -6,6 +6,8 @@ import {
   folderOf,
   MAX_3D_NODES,
   MAX_3D_EDGES,
+  MAX_ANIMATED_3D_EDGES,
+  shouldAnimate3D,
 } from './architecture-3d-data.js';
 const metadata = { confidence: 1, evidence: [] };
 const graph: DependencyGraph = {
@@ -63,6 +65,15 @@ describe('3D scene transformation', () => {
       scene.edges.find((edge) => edge.evidence[0]?.id === '1')?.sourceId,
     ).toBe('a');
     expect(folderOf(graph.nodes[0]!)).toBe('src/ui');
+  });
+  it('pauses arrow motion for hidden pages, reduced motion and large graphs', () => {
+    expect(shouldAnimate3D(5, true, false, true)).toBe(true);
+    expect(shouldAnimate3D(5, true, true, true)).toBe(false);
+    expect(shouldAnimate3D(5, true, false, false)).toBe(false);
+    expect(shouldAnimate3D(5, false, false, true)).toBe(false);
+    expect(shouldAnimate3D(MAX_ANIMATED_3D_EDGES + 1, true, false, true)).toBe(
+      false,
+    );
   });
   it('rejects graphs beyond explicit limits', () => {
     expect(canRender3D(graph)).toBe(true);

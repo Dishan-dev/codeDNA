@@ -15,6 +15,76 @@
     "./learning": {
       "types": "./dist/learning.d.ts",
       "import": "./dist/learning.js"
+    },
+    "./repository-overview": {
+      "types": "./dist/repository-overview.d.ts",
+      "import": "./dist/repository-overview.js",
+      "default": "./dist/repository-overview.js"
+    },
+    "./route-context": {
+      "types": "./dist/route-context.d.ts",
+      "import": "./dist/route-context.js",
+      "default": "./dist/route-context.js"
+    },
+    "./capabilities": {
+      "types": "./dist/capabilities.d.ts",
+      "import": "./dist/capabilities.js",
+      "default": "./dist/capabilities.js"
+    },
+    "./ui-flow-stage": {
+      "types": "./dist/ui-flow-stage.d.ts",
+      "import": "./dist/ui-flow-stage.js",
+      "default": "./dist/ui-flow-stage.js"
+    },
+    "./understanding": {
+      "types": "./dist/understanding.d.ts",
+      "import": "./dist/understanding.js",
+      "default": "./dist/understanding.js"
+    },
+    "./features": {
+      "types": "./dist/features.d.ts",
+      "import": "./dist/features.js",
+      "default": "./dist/features.js"
+    },
+    "./static-flow": {
+      "types": "./dist/static-flow.d.ts",
+      "import": "./dist/static-flow.js",
+      "default": "./dist/static-flow.js"
+    },
+    "./behaviors": {
+      "types": "./dist/behaviors.d.ts",
+      "import": "./dist/behaviors.js",
+      "default": "./dist/behaviors.js"
+    },
+    "./evidence": {
+      "types": "./dist/evidence.d.ts",
+      "import": "./dist/evidence.js",
+      "default": "./dist/evidence.js"
+    },
+    "./stories": {
+      "types": "./dist/stories.d.ts",
+      "import": "./dist/stories.js",
+      "default": "./dist/stories.js"
+    },
+    "./ask": {
+      "types": "./dist/ask.d.ts",
+      "import": "./dist/ask.js",
+      "default": "./dist/ask.js"
+    },
+    "./ai-grounding": {
+      "types": "./dist/ai-grounding.d.ts",
+      "import": "./dist/ai-grounding.js",
+      "default": "./dist/ai-grounding.js"
+    },
+    "./actions": {
+      "types": "./dist/actions.d.ts",
+      "import": "./dist/actions.js",
+      "default": "./dist/actions.js"
+    },
+    "./trace-view": {
+      "types": "./dist/trace-view.d.ts",
+      "import": "./dist/trace-view.js",
+      "default": "./dist/trace-view.js"
     }
   },
   "files": [

@@ -13,6 +13,21 @@
       "types": "./dist/architecture-3d.d.ts",
       "import": "./dist/architecture-3d.js",
       "default": "./dist/architecture-3d.js"
+    },
+    "./architecture-map": {
+      "types": "./dist/architecture-map.d.ts",
+      "import": "./dist/architecture-map.js",
+      "default": "./dist/architecture-map.js"
+    },
+    "./architecture-overview": {
+      "types": "./dist/architecture-overview.d.ts",
+      "import": "./dist/architecture-overview.js",
+      "default": "./dist/architecture-overview.js"
+    },
+    "./ui-flow-map": {
+      "types": "./dist/ui-flow-map.d.ts",
+      "import": "./dist/ui-flow-map.js",
+      "default": "./dist/ui-flow-map.js"
     }
   },
   "files": [

@@ -1,9 +1,12 @@
 ﻿import { test, expect } from '@playwright/test';
+import { openAdvanced } from './helpers.mjs';
 import { readFile } from 'node:fs/promises';
 import {
   analyzeSnapshot,
   analyzeUIFlows,
 } from '../../packages/core/dist/index.js';
+import { understandRepository } from '../../packages/core/dist/understanding.js';
+import { discoverFeatures } from '../../packages/core/dist/features.js';
 const fixture = JSON.parse(
   await readFile(
     new URL(
@@ -15,6 +18,7 @@ const fixture = JSON.parse(
 );
 const response = (revision = 'one', complete = true) => {
   const snapshot = { ...fixture, id: `mock@${revision}`, revision };
+  const analysis = analyzeSnapshot(snapshot), uiFlow = analyzeUIFlows(snapshot);
   return {
     repository: {
       owner: 'test',
@@ -23,8 +27,10 @@ const response = (revision = 'one', complete = true) => {
     },
     commitSha: revision,
     snapshot,
-    analysis: analyzeSnapshot(snapshot),
-    uiFlow: analyzeUIFlows(snapshot),
+    analysis,
+    uiFlow,
+    understanding: understandRepository(snapshot, analysis, uiFlow.graph, complete),
+    features: discoverFeatures(snapshot, analysis, uiFlow.graph),
     completeness: { complete, skippedFiles: complete ? 0 : 1 },
     diagnostics: [],
   };
@@ -33,11 +39,19 @@ test('demo architecture, source inspection and impact paths', async ({
   page,
 }) => {
   await page.goto('/explorer');
+  await openAdvanced(page);
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Architecture' }).click();
+  await page.getByRole('button', { name: '2D', exact: true }).click();
   await expect(page.getByLabel('Architecture dependency map')).toBeVisible();
-  await page.getByRole('button', { name: 'src/lib/greet.ts' }).click();
+  const files = page.getByRole('complementary', { name: 'Repository files' });
+  await files.getByRole('button', { name: 'src', exact: true }).click();
+  await files.getByRole('button', { name: 'lib', exact: true }).click();
+  await files.locator('[title="src/lib/greet.ts"]').click();
   await expect(
     page.getByLabel('Context inspector').locator('pre'),
   ).toContainText('export const greet');
+  await openAdvanced(page);
   await page.getByRole('tab', { name: 'Impact Analysis' }).click();
   await expect(page.getByLabel('Impact summary')).toContainText('1 direct');
   await expect(page.getByLabel('Impact results')).toContainText('src/app.ts');
@@ -53,15 +67,18 @@ test('Next fixture renders UI flow and source navigation by keyboard', async ({
   page,
 }) => {
   await page.goto('/explorer?example=next');
+  await openAdvanced(page);
   const tab = page.getByRole('tab', { name: 'Architecture' });
   await tab.focus();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'UI Flow' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(
+    page.getByRole('tab', { name: 'Routes & Features' }),
+  ).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: 'Advanced flow map' }).click();
   await expect(page.getByLabel('UI Flow screen map')).toBeVisible();
-  await page.getByRole('button', { name: 'app/page.tsx' }).click();
+  const files = page.getByRole('complementary', { name: 'Repository files' });
+  await files.getByRole('button', { name: 'app', exact: true }).click();
+  await files.locator('[title="app/page.tsx"]').click();
   await expect(page.getByLabel('Context inspector')).toContainText(
     '/projects/42',
   );
@@ -72,7 +89,9 @@ test('Next fixture renders UI flow and source navigation by keyboard', async ({
 });
 test('learning progress and cross-mode navigation', async ({ page }) => {
   await page.goto('/explorer');
-  await page.getByRole('tab', { name: 'Learning Mode' }).click();
+  await openAdvanced(page);
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Learning' }).click();
   await expect(page.getByLabel('Learning roadmap')).toContainText(
     'Understand the codebase',
   );
@@ -84,7 +103,8 @@ test('learning progress and cross-mode navigation', async ({ page }) => {
     'aria-selected',
     'true',
   );
-  await page.getByRole('tab', { name: 'Learning Mode' }).click();
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Learning' }).click();
   await expect(page.getByLabel('Learning roadmap')).toContainText('1 of');
 });
 test('mocked acquisition, partial snapshot and revision isolation', async ({
@@ -101,7 +121,8 @@ test('mocked acquisition, partial snapshot and revision isolation', async ({
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await expect(page).toHaveURL(/source=github/);
   await expect(page.getByText(/partial/i).first()).toBeVisible();
-  await page.getByRole('tab', { name: 'Learning Mode' }).click();
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Learning' }).click();
   await page.getByRole('button', { name: 'Mark complete' }).click();
   revision = 'two';
   await page.goto('/');
@@ -110,7 +131,8 @@ test('mocked acquisition, partial snapshot and revision isolation', async ({
     .fill('https://github.com/test/repo');
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await expect(page).toHaveURL(/source=github/);
-  await page.getByRole('tab', { name: 'Learning Mode' }).click();
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Learning' }).click();
   await expect(page.getByLabel('Learning roadmap')).toContainText('0 of');
 });
 test('invalid URL and mocked acquisition error', async ({ page }) => {
@@ -154,6 +176,8 @@ test('knowledge check records an answer from real dependency evidence', async ({
     snapshot,
     analysis: analyzeSnapshot(snapshot),
     uiFlow: analyzeUIFlows(snapshot),
+    understanding: understandRepository(snapshot, analyzeSnapshot(snapshot), analyzeUIFlows(snapshot).graph),
+    features: discoverFeatures(snapshot, analyzeSnapshot(snapshot), analyzeUIFlows(snapshot).graph),
   };
   await page.route('**/api/repositories/acquire', (route) =>
     route.fulfill({ status: 200, json: payload }),
@@ -164,7 +188,8 @@ test('knowledge check records an answer from real dependency evidence', async ({
     .fill('https://github.com/test/repo');
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await expect(page).toHaveURL(/source=github/);
-  await page.getByRole('tab', { name: 'Learning Mode' }).click();
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Learning' }).click();
   await page
     .getByRole('button', { name: /Recap and check your understanding/ })
     .click();
@@ -202,6 +227,8 @@ test('React Router analyzed fixture renders screen navigation', async ({
         snapshot,
         analysis: analyzeSnapshot(snapshot),
         uiFlow: analyzeUIFlows(snapshot),
+        understanding: understandRepository(snapshot, analyzeSnapshot(snapshot), analyzeUIFlows(snapshot).graph),
+        features: discoverFeatures(snapshot, analyzeSnapshot(snapshot), analyzeUIFlows(snapshot).graph),
       },
     }),
   );
@@ -211,9 +238,15 @@ test('React Router analyzed fixture renders screen navigation', async ({
     .fill('https://github.com/test/repo');
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await expect(page).toHaveURL(/source=github/);
-  await page.getByRole('tab', { name: 'UI Flow' }).click();
+  await openAdvanced(page);
+  await page.getByRole('tab', { name: 'Routes & Features' }).click();
+  await page.getByRole('button', { name: 'Advanced flow map' }).click();
   await expect(page.getByLabel('UI Flow screen map')).toBeVisible();
-  await page.getByRole('button', { name: 'src/Home.tsx' }).click();
+  const fileTree = page.getByRole('complementary', {
+    name: 'Repository files',
+  });
+  await fileTree.getByRole('button', { name: 'src', exact: true }).click();
+  await fileTree.locator('[title="src/Home.tsx"]').click();
   await expect(page.getByLabel('Context inspector')).toContainText('/about');
   await expect(page.getByLabel('Context inspector')).toContainText(
     'react-router',

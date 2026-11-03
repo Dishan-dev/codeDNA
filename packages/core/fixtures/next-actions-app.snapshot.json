@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture-next-actions-app",
+  "files": [
+    {
+      "id": "app/admin/csv.ts",
+      "path": "app/admin/csv.ts",
+      "content": "export function download() {\n  return 'id,nights\\n';\n}\n"
+    },
+    {
+      "id": "app/admin/page.tsx",
+      "path": "app/admin/page.tsx",
+      "content": "import { Toolbar } from './toolbar';\n\nexport const metadata = { title: 'Admin' };\n\nexport default function AdminPage() {\n  return <Toolbar endpoint=\"/api/import\" />;\n}\n"
+    },
+    {
+      "id": "app/admin/toolbar.tsx",
+      "path": "app/admin/toolbar.tsx",
+      "content": "'use client';\nimport { quotePrice, flatPrice } from '@/lib/pricing';\n\nconst strategies = { quote: quotePrice, flat: flatPrice };\n\nexport function Toolbar({ endpoint }: { endpoint: string }) {\n  async function exportCsv() {\n    const csv = await import('./csv');\n    csv.download();\n  }\n  async function importBookings() {\n    await fetch(endpoint, { method: 'POST' });\n  }\n  function runPricing(kind: keyof typeof strategies) {\n    strategies[kind](1);\n  }\n  return (\n    <div>\n      <button onClick={exportCsv}>Export CSV</button>\n      <button onClick={importBookings}>Import bookings</button>\n      <button onClick={() => runPricing('quote')}>Run pricing job</button>\n    </div>\n  );\n}\n"
+    },
+    {
+      "id": "app/api/favorites/route.ts",
+      "path": "app/api/favorites/route.ts",
+      "content": "import { prisma } from '@/lib/db';\n\nexport async function POST(request: Request) {\n  const { roomId } = await request.json();\n  const favorite = await prisma.favorite.create({ data: { roomId } });\n  return Response.json(favorite);\n}\n"
+    },
+    {
+      "id": "app/api/promos/[code]/route.ts",
+      "path": "app/api/promos/[code]/route.ts",
+      "content": "import { quotePrice } from '@/lib/pricing';\n\nexport async function GET(_request: Request, { params }: { params: { code: string } }) {\n  const discounted = quotePrice(1, params.code);\n  return Response.json({ discounted });\n}\n"
+    },
+    {
+      "id": "app/book/[roomId]/page.tsx",
+      "path": "app/book/[roomId]/page.tsx",
+      "content": "import { BookingForm } from '@/components/booking-form';\n\nexport default function BookPage() {\n  return <BookingForm />;\n}\n"
+    },
+    {
+      "id": "app/bookings/page.tsx",
+      "path": "app/bookings/page.tsx",
+      "content": "import { prisma } from '@/lib/db';\n\nexport default async function BookingsPage() {\n  const bookings = await prisma.booking.findMany();\n  return <p>{bookings.length} bookings</p>;\n}\n"
+    },
+    {
+      "id": "app/layout.tsx",
+      "path": "app/layout.tsx",
+      "content": "export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  );\n}\n"
+    },
+    {
+      "id": "app/page.tsx",
+      "path": "app/page.tsx",
+      "content": "import Link from 'next/link';\nimport { SearchBox } from '@/components/search-box';\n\nexport const metadata = { title: 'Roomly' };\n\nexport default function Home() {\n  return (\n    <main>\n      <h1>Find a room</h1>\n      <SearchBox />\n      <Link href=\"/rooms\">Browse rooms</Link>\n    </main>\n  );\n}\n"
+    },
+    {
+      "id": "app/rooms/page.tsx",
+      "path": "app/rooms/page.tsx",
+      "content": "import { RoomList } from '@/components/room-list';\n\nexport default function RoomsPage() {\n  return <RoomList />;\n}\n"
+    },
+    {
+      "id": "components/booking-form.tsx",
+      "path": "components/booking-form.tsx",
+      "content": "'use client';\nimport { useActionState, useState } from 'react';\nimport Link from 'next/link';\nimport { createBooking } from '@/lib/bookings/actions';\n\nexport function BookingForm() {\n  const [state, formAction] = useActionState(createBooking, null);\n  const [discount, setDiscount] = useState(0);\n  const [code, setCode] = useState('');\n\n  async function applyPromo() {\n    const response = await fetch(`/api/promos/${code}`);\n    const body = await response.json();\n    setDiscount(body.discounted);\n  }\n\n  return (\n    <form action={formAction}>\n      <input name=\"nights\" />\n      <input value={code} onChange={(event) => setCode(event.target.value)} />\n      <button type=\"button\" onClick={applyPromo}>Apply promo</button>\n      <p>{state?.errors ? 'Please check the form' : discount}</p>\n      <button type=\"submit\">Reserve room</button>\n      <Link href=\"/rooms\">Back to rooms</Link>\n    </form>\n  );\n}\n"
+    },
+    {
+      "id": "components/room-list.tsx",
+      "path": "components/room-list.tsx",
+      "content": "'use client';\nimport Link from 'next/link';\nimport { toggleFavorite } from '@/lib/favorites';\n\nconst rooms = [{ id: 'r1', name: 'Harbour' }];\n\nexport function RoomList() {\n  return (\n    <ul>\n      {rooms.map((room) => (\n        <li key={room.id}>\n          <Link href={`/book/${room.id}`}>{room.name}</Link>\n          <button onClick={() => toggleFavorite(room.id)}>Save favorite</button>\n        </li>\n      ))}\n    </ul>\n  );\n}\n"
+    },
+    {
+      "id": "components/search-box.tsx",
+      "path": "components/search-box.tsx",
+      "content": "'use client';\nimport { useState } from 'react';\nimport { track } from '@/analytics/client';\n\nexport function SearchBox() {\n  const [query, setQuery] = useState('');\n  function submitSearch() {\n    track('search', query);\n  }\n  return (\n    <form onSubmit={submitSearch}>\n      <input value={query} onChange={(event) => setQuery(event.target.value)} />\n      <button type=\"submit\">Search</button>\n    </form>\n  );\n}\n"
+    },
+    {
+      "id": "lib/bookings/actions.ts",
+      "path": "lib/bookings/actions.ts",
+      "content": "'use server';\nimport { redirect } from 'next/navigation';\nimport { revalidatePath } from 'next/cache';\nimport { cookies } from 'next/headers';\nimport { prisma } from '@/lib/db';\nimport { BookingSchema } from './schema';\nimport { quotePrice } from '@/lib/pricing';\nimport { getPaymentGateway } from '@/lib/payments';\n\nexport async function createBooking(_previous: unknown, formData: FormData) {\n  const parsed = BookingSchema.safeParse(Object.fromEntries(formData));\n  if (!parsed.success) {\n    return { errors: parsed.error.flatten().fieldErrors };\n  }\n  const session = (await cookies()).get('session');\n  if (!session) redirect('/login');\n  const price = quotePrice(parsed.data.nights, parsed.data.code);\n  const receipt = await getPaymentGateway().charge(price);\n  const booking = await prisma.booking.create({\n    data: { nights: parsed.data.nights, price, receipt: receipt.id },\n  });\n  revalidatePath('/bookings');\n  redirect(`/bookings/${booking.id}`);\n}\n"
+    },
+    {
+      "id": "lib/bookings/schema.ts",
+      "path": "lib/bookings/schema.ts",
+      "content": "import { z } from 'zod';\n\nexport const BookingSchema = z.object({\n  nights: z.coerce.number().min(1),\n  code: z.string().optional(),\n});\n"
+    },
+    {
+      "id": "lib/db.ts",
+      "path": "lib/db.ts",
+      "content": "import { PrismaClient } from '@prisma/client';\n\nexport const prisma = new PrismaClient();\n"
+    },
+    {
+      "id": "lib/favorites.ts",
+      "path": "lib/favorites.ts",
+      "content": "export async function toggleFavorite(roomId: string) {\n  const response = await fetch('/api/favorites', {\n    method: 'POST',\n    body: JSON.stringify({ roomId }),\n  });\n  return response.ok;\n}\n"
+    },
+    {
+      "id": "lib/payments/index.ts",
+      "path": "lib/payments/index.ts",
+      "content": "import { stripeGateway } from './stripe';\nimport { mockGateway } from './mock';\n\nconst gateways = { stripe: stripeGateway, mock: mockGateway };\n\nexport function getPaymentGateway() {\n  const key = process.env.PAYMENT_GATEWAY as keyof typeof gateways;\n  return gateways[key];\n}\n"
+    },
+    {
+      "id": "lib/payments/mock.ts",
+      "path": "lib/payments/mock.ts",
+      "content": "export const mockGateway = {\n  async charge(amount: number) {\n    return { id: `mock-${amount}` };\n  },\n};\n"
+    },
+    {
+      "id": "lib/payments/stripe.ts",
+      "path": "lib/payments/stripe.ts",
+      "content": "export const stripeGateway = {\n  async charge(amount: number) {\n    return { id: `stripe-${amount}` };\n  },\n};\n"
+    },
+    {
+      "id": "lib/pricing.ts",
+      "path": "lib/pricing.ts",
+      "content": "const PROMOS: Record<string, number> = { SPRING: 0.1 };\n\nexport function quotePrice(nights: number, code?: string) {\n  const base = nights * 120;\n  const discount = code ? base * (PROMOS[code] ?? 0) : 0;\n  return Math.max(0, base - discount);\n}\n\nexport function flatPrice() {\n  return 99;\n}\n"
+    },
+    {
+      "id": "tsconfig.json",
+      "path": "tsconfig.json",
+      "content": "{\n  \"compilerOptions\": {\n    \"jsx\": \"preserve\",\n    \"baseUrl\": \".\",\n    \"paths\": { \"@/*\": [\"./*\"] }\n  }\n}\n"
+    }
+  ],
+  "documents": [
+    {
+      "path": "README.md",
+      "content": "# Roomly\n\nRoomly is a small room-booking application: guests browse rooms, save favorites and reserve a room; staff export bookings and run pricing jobs.\n\nIt is a CodeDNA test fixture. Some code paths are deliberately impossible to follow statically.\n"
+    }
+  ],
+  "manifests": [
+    {
+      "path": "package.json",
+      "content": "{\n  \"name\": \"roomly\",\n  \"private\": true,\n  \"dependencies\": {\n    \"@prisma/client\": \"5.0.0\",\n    \"next\": \"15.0.0\",\n    \"react\": \"19.0.0\",\n    \"zod\": \"3.23.0\"\n  }\n}\n"
+    }
+  ]
+}

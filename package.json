@@ -6,8 +6,9 @@
     "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "node scripts/web.mjs dev",
     "build": "turbo run build",
+    "start": "node scripts/web.mjs start",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",

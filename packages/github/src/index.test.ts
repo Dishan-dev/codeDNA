@@ -32,6 +32,7 @@ function setup(
     links?: boolean;
     duplicate?: boolean;
     inconsistent?: boolean;
+    largeAsset?: boolean;
   } = {},
 ) {
   const a = blob(`import './util';`);
@@ -108,6 +109,9 @@ function setup(
           },
         ]
       : []),
+    ...(config.largeAsset
+      ? [{ path: 'assets/video.bin', type: 'blob', mode: '100644', sha: commit, size: 120 * 1024 * 1024 }]
+      : []),
   ];
   const calls: { url: string; init?: RequestInit }[] = [];
   const fetcher: typeof fetch = async (input, init) => {
@@ -151,6 +155,14 @@ function setup(
   return { fetcher, calls };
 }
 describe('GitHub acquisition', () => {
+  it('pins and separates README text from analyzable source', async () => {
+    const { fetcher } = setup();
+    const result = await acquireRepository('https://github.com/test/repo', { fetch: fetcher });
+    expect(result.snapshot.revision).toBe(commit);
+    expect(result.snapshot.documents).toEqual([{ path: 'README.md', content: "import './util';" }]);
+    expect(result.snapshot.files.every((file) => file.path !== 'README.md')).toBe(true);
+    expect(analyzeSnapshot(result.snapshot).snapshotId).toBe(result.snapshot.id);
+  });
   it('strictly parses canonical URLs', () => {
     expect(parseRepositoryUrl('https://github.com/Owner/Repo')).toEqual({
       owner: 'owner',
@@ -222,6 +234,16 @@ describe('GitHub acquisition', () => {
     expect(result.snapshot.files[0]?.content).toBe(
       result.snapshot.files[2]?.content,
     );
+  });
+  it('selects source blobs when unrelated archive contents are large', async () => {
+    const { fetcher, calls } = setup({ largeAsset: true });
+    const result = await acquireRepository('https://github.com/test/repo', {
+      fetch: fetcher,
+      strategy: 'auto',
+    });
+    expect(result.snapshot.files).toHaveLength(2);
+    expect(calls.some((call) => call.url.includes('codeload.github.com'))).toBe(false);
+    expect(calls.filter((call) => call.url.includes('/git/blobs/'))).toHaveLength(2);
   });
   it('rejects inconsistent sizes for the same blob before downloading content', async () => {
     const { fetcher, calls } = setup({ inconsistent: true });

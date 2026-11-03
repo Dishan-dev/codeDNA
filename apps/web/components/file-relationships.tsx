@@ -1,5 +1,5 @@
 ﻿'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   describeDependency,
   type DependencyEdge,
@@ -16,6 +16,7 @@ export function FileRelationships({
   onSelect: (id: string) => void;
   onEvidence: (path: string, line: number) => void;
 }) {
+  const [limit, setLimit] = useState(30);
   const { nodes, incoming, outgoing, external } = useMemo(() => {
     const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
     const incoming: DependencyEdge[] = [],
@@ -41,7 +42,7 @@ export function FileRelationships({
         {title} ({edges.length})
       </h3>
       {edges.length ? (
-        edges.map((edge) => {
+        edges.slice(0, limit).map((edge) => {
           const other =
             direction === 'incoming' ? edge.sourceId : edge.targetId;
           const node = nodes.get(other);
@@ -84,6 +85,15 @@ export function FileRelationships({
         })
       ) : (
         <p>None detected.</p>
+      )}
+      {edges.length > limit && (
+        <button
+          type="button"
+          className="relationship-evidence"
+          onClick={() => setLimit((value) => value + 30)}
+        >
+          Show more ({edges.length - limit} remaining)
+        </button>
       )}
     </section>
   );

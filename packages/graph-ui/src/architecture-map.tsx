@@ -16,6 +16,7 @@ import {
   type DependencyEdge,
   type DependencyGraph,
 } from '@codedna/shared';
+import { DependencyEvidence } from './dependency-evidence.js';
 import {
   adaptGraph,
   neighborhood,
@@ -72,6 +73,9 @@ export interface ArchitectureMapProps {
   onSelectionChange: (id: string | null) => void;
   highlightedNodeIds?: readonly string[];
   highlightedEdgeIds?: readonly string[];
+  edgeEvidence?: Record<string, DependencyEdge[]>;
+  evidenceGraph?: DependencyGraph;
+  onEvidence?: (path: string, line: number) => void;
 }
 function MapCanvas({
   graph,
@@ -79,6 +83,9 @@ function MapCanvas({
   onSelectionChange,
   highlightedNodeIds,
   highlightedEdgeIds,
+  edgeEvidence,
+  evidenceGraph,
+  onEvidence,
 }: ArchitectureMapProps) {
   const adapted = useMemo(() => adaptGraph(graph), [graph]);
   const [laidOut, setLaidOut] = useState<AdaptedGraph | null>(null);
@@ -191,7 +198,10 @@ function MapCanvas({
       </div>
     );
   return (
-    <div className="dna-map" aria-label="Architecture dependency map">
+    <div
+      className={`dna-map ${adapted.edges.length > 250 ? 'dna-map--large' : ''}`}
+      aria-label="Architecture dependency map"
+    >
       {adapted.nodes.length >= 250 && (
         <div className="dna-graph-notice" role="status">
           Large map: {adapted.nodes.length} nodes. Layout may take a moment; all
@@ -274,6 +284,15 @@ function MapCanvas({
                 ?.label ?? selectedEdge.targetId,
             )}
           </p>
+          {(edgeEvidence?.[selectedEdge.id] ||
+            (selectedEdge.location && onEvidence)) && (
+            <DependencyEvidence
+              key={selectedEdge.id}
+              edges={edgeEvidence?.[selectedEdge.id] ?? [selectedEdge]}
+              graph={evidenceGraph ?? graph}
+              {...(onEvidence ? { onSource: onEvidence } : {})}
+            />
+          )}
           {selectedEdge.location && (
             <small>
               Source: {selectedEdge.location.path}:

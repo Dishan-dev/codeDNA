@@ -28,6 +28,13 @@ export interface RepositorySnapshot {
   id: StableId;
   files: SourceFile[];
   revision?: string;
+  /** Optional, bounded untrusted text acquired at the same revision. */
+  documents?: RepositoryText[];
+  manifests?: RepositoryText[];
+}
+export interface RepositoryText {
+  path: string;
+  content: string;
 }
 export interface AnalysisDiagnostic {
   id: StableId;
@@ -220,3 +227,63 @@ export interface LearningPlan {
 }
 
 export { describeDependency } from './explanations.js';
+
+export type {
+  CapabilityStatus,
+  CapabilityKind,
+  CapabilityEvidence,
+  AnalysisCapability,
+  CapabilityAssessment,
+} from './capabilities.js';
+export type {
+  RepositoryUnderstanding,
+  UnderstandingClaim,
+  FeatureDiscovery,
+  DiscoveredFeature,
+  DiscoveredSymbol,
+  StaticFlow,
+  StaticFlowStep,
+  StaticFlowRelationship,
+} from './understanding.js';
+
+export { BEHAVIOR_SCHEMA_VERSION } from './behavior.js';
+export type {
+  ExplanationCertainty,
+  BehaviorCategory,
+  EvidenceItem,
+  EvidenceBundle,
+  Behavior,
+  BehaviorDiscovery,
+  StepRole,
+  StoryStep,
+  BehaviorStory,
+  AnswerAction,
+  Answer,
+  AiExplanationResponse,
+  AiStatus,
+} from './behavior.js';
+
+export { TRACE_SCHEMA_VERSION, STRUCTURAL_TIERS } from './trace.js';
+export type {
+  EvidenceTier,
+  StructuralTier,
+  TierCounts,
+  TriggerKind,
+  EffectKind,
+  Effect,
+  PageEntry,
+  UserAction,
+  TraceExcerpt,
+  TraceBranch,
+  TraceBranchOption,
+  TraceSymbol,
+  TraceStepKind,
+  TraceStepData,
+  TraceStep,
+  StoredTrace,
+  Trace,
+  ReachPath,
+  ReverseReach,
+  ActionGap,
+  ActionIndex,
+} from './trace.js';

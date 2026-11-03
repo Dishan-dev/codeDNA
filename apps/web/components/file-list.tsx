@@ -18,17 +18,12 @@ export function FileList({
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [currentFolder, setCurrentFolder] = useState('');
+  const [searchLimit, setSearchLimit] = useState(200);
   const folderButtons = useRef(new Map<string, HTMLButtonElement>());
   const rootRef = useRef<HTMLDivElement>(null);
-  const tree = useMemo(
-    () =>
-      buildFileTree(
-        files.filter((file) =>
-          file.path.toLowerCase().includes(query.toLowerCase()),
-        ),
-      ),
-    [files, query],
-  );
+  const matching = useMemo(() => files.filter((file) => file.path.toLowerCase().includes(query.toLowerCase())), [files, query]);
+  const tree = useMemo(() => buildFileTree(query ? matching.slice(0, searchLimit) : matching), [matching, query, searchLimit]);
+  useEffect(() => setSearchLimit(200), [query]);
   useEffect(() => {
     if (selected) {
       const parts = selected.split('/');
@@ -155,6 +150,7 @@ export function FileList({
       ) : (
         <p className="no-files">No files match your search.</p>
       )}
+      {query && matching.length > searchLimit && <button type="button" className="guide-more" onClick={() => setSearchLimit((value) => value + 200)}>Show more matches ({Math.min(searchLimit, matching.length)} of {matching.length})</button>}
     </div>
   );
 }

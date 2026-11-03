@@ -1,9 +1,9 @@
 ﻿import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import type { RepositorySnapshot, AnalysisResult } from '@codedna/shared';
+import type { RepositorySnapshot, AnalysisResult, RepositoryUnderstanding, FeatureDiscovery, ActionIndex } from '@codedna/shared';
 import type { UIFlowAnalysis } from '@codedna/core';
 
-type Result = { analysis: AnalysisResult; uiFlow: UIFlowAnalysis };
+type Result = { analysis: AnalysisResult; uiFlow: UIFlowAnalysis; understanding: RepositoryUnderstanding; features: FeatureDiscovery; actions: ActionIndex };
 export class AnalysisWorkerError extends Error {
   constructor(readonly code: 'timeout' | 'cancelled' | 'failed') {
     super(code);
@@ -13,14 +13,14 @@ export class AnalysisWorkerError extends Error {
 export function runAnalysisWorker(
   snapshot: RepositorySnapshot,
   signal: AbortSignal,
-  options: { timeoutMs?: number; workerPath?: string } = {},
+  options: { timeoutMs?: number; workerPath?: string; complete?: boolean } = {},
 ): Promise<Result> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) return reject(new AnalysisWorkerError('cancelled'));
     const worker = new Worker(
       options.workerPath ?? join(process.cwd(), 'workers', 'analysis.mjs'),
       {
-        workerData: snapshot,
+        workerData: { snapshot, complete: options.complete ?? true },
         resourceLimits: {
           maxOldGenerationSizeMb: 256,
           maxYoungGenerationSizeMb: 32,

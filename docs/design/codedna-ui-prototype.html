@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeDNA — Proposed UI prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F6F3; --card:#FFFFFF; --ink:#16181D; --ink2:#3A3D45; --muted:#5C5F68; --line:#E2E2DC; --line2:#F0F0EB;
+  --proven-bg:#E3F3F0; --proven:#0B5E57;
+  --fw-bg:#E6ECFA; --fw:#1E46A8;
+  --guess-bg:#FCEFDF; --guess:#7F4305;
+  --ai-bg:#F0E9FC; --ai:#5B21B6;
+  --gap:#A12A1C; --gap-line:#C2493B; --gap-bg:#FFF8F7;
+  --mono:'IBM Plex Mono', ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.5}
+a{color:var(--fw)} a:hover{color:var(--ink)}
+.mono{font-family:var(--mono)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+button{font:inherit;cursor:pointer}
+
+/* header */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:12px 32px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.repo{display:flex;align-items:center;gap:8px}
+.pill{font-family:var(--mono);font-size:13px;padding:2px 8px;border-radius:6px;background:#EFEFEA;color:#44474F}
+nav.tabs{display:flex;gap:20px}
+nav.tabs button{background:none;border:0;padding:10px 0;color:#44474F;border-bottom:2px solid transparent}
+nav.tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.search{flex:1 1 260px;display:flex;position:relative}
+.search input{flex:1;min-height:44px;padding:0 14px;border:1px solid #D4D4CC;border-radius:8px;font:inherit;background:#FAFAF8}
+.results{position:absolute;top:48px;left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:none;overflow:hidden}
+.results button{display:flex;justify-content:space-between;width:100%;text-align:left;padding:10px 14px;border:0;background:none;border-bottom:1px solid var(--line2)}
+.results button:hover,.results button:focus{background:#F6F6F3}
+.hbtn{min-height:44px;padding:0 14px;border:1px solid #D4D4CC;border-radius:8px;background:var(--card);color:#44474F;font-size:14px}
+.hbtn.on{border-color:var(--ai);color:var(--ai);background:var(--ai-bg)}
+.menu{position:relative}
+.menu-list{position:absolute;right:0;top:50px;width:260px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:6px;display:none}
+.menu-list div{padding:8px 10px;border-radius:6px;font-size:14px}
+.menu-list div small{display:block;color:var(--muted);font-size:12px}
+.menu-list div:hover{background:#F6F6F3}
+
+main{max-width:1240px;margin:0 auto;padding:32px 32px 72px;display:flex;flex-direction:column;gap:24px}
+.screen{display:none}.screen.on{display:flex}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
+h1{margin:0;font-size:32px;letter-spacing:-.01em}
+h2{margin:0;font-size:17px}
+.crumb{font-size:14px;color:var(--muted)}
+.crumb button{background:none;border:0;padding:0;color:var(--fw);text-decoration:underline}
+
+/* badges */
+.b{display:inline-block;text-align:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.b.proven{background:var(--proven-bg);color:var(--proven)}
+.b.fw{background:var(--fw-bg);color:var(--fw)}
+.b.guess{background:var(--guess-bg);color:var(--guess)}
+.b.ai{background:var(--ai-bg);color:var(--ai)}
+.b.gap{background:#fff;color:var(--gap);border:1px dashed var(--gap-line)}
+
+/* overview */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.stat{padding:18px 20px}.stat b{display:block;font-size:30px}
+.stat span{color:#4A4D55}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden}
+.two{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.two>.wide{flex:999 1 560px;min-width:0}.two>.side{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:24px}
+.row{display:grid;grid-template-columns:minmax(170px,2fr) minmax(0,3fr) 100px 130px;gap:16px;align-items:center;padding:14px 24px;border:0;border-bottom:1px solid var(--line2);background:none;width:100%;text-align:left;color:inherit}
+.row:hover{background:#FAFAF7}
+.gapcard{border:1px dashed #D9897F;background:var(--gap-bg);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.legend{display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--ink2)}
+.legend div{display:flex;gap:10px;align-items:center}.legend .b{flex:0 0 104px}
+
+/* page inventory */
+.grp-h{padding:14px 24px;background:#FAFAF7;border-bottom:1px solid #ECECE6;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;border-radius:12px 12px 0 0}
+.act{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line2)}
+.act:last-child{border-bottom:0}
+.chip{font-size:12px;padding:3px 9px;border-radius:6px;background:#F1F1EC;color:#33363D;font-family:var(--mono)}
+.go{min-height:44px;padding:0 16px;border-radius:8px;background:var(--ink);color:#fff;border:0;font-size:14px;font-weight:500}
+.filters button{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid #D4D4CC;background:#fff;font-size:14px}
+.filters button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* trace */
+.trace{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.steps{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;gap:0}
+.step{display:flex;gap:14px;width:100%;text-align:left;background:none;border:0;padding:0;color:inherit}
+.rail{display:flex;flex-direction:column;align-items:center;flex:0 0 28px}
+.dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;background:#fff;border:2px solid #C9C9C1;color:var(--muted)}
+.line{flex:1;width:2px;background:#DADAD3;min-height:14px}
+.line.dash{background:none;border-left:2px dashed var(--gap-line)}
+.sbody{flex:1;min-width:0;margin-bottom:12px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.step.on .sbody{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.step.on .dot{background:var(--ink);border-color:var(--ink);color:#fff}
+.step.isgap .sbody{border-style:dashed;border-color:var(--gap-line);background:var(--gap-bg)}
+.step.isgap .dot{border-style:dashed;border-color:var(--gap-line);color:var(--gap)}
+.stitle{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.stitle b{font-size:15px}
+.scode{font-family:var(--mono);font-size:12.5px;color:#33363D;margin-top:4px}
+.splain{font-size:14px;color:var(--ink2);margin-top:6px}
+.aitext{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--ai-bg);color:#3B1785;font-size:13.5px;display:none}
+.ai-on .aitext{display:block}
+.branch{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.branch .cond{font-family:var(--mono);font-size:12px;padding:2px 6px;background:#F1F1EC;border-radius:4px}
+.branch button{min-height:32px;padding:0 10px;border-radius:999px;border:1px solid #D4D4CC;background:#fff;font-size:13px}
+.branch button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.codepanel{flex:1 1 520px;min-width:0;position:sticky;top:90px;background:#16181D;color:#E6E6E1;border-radius:12px;overflow:hidden}
+.cp-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #2C2F36;font-family:var(--mono);font-size:13px;color:#B9BAB3}
+.cp-body{padding:12px 0;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.75}
+.ln{display:flex;white-space:pre;padding:0 16px}
+.ln i{font-style:normal;flex:0 0 40px;color:#6E7079;user-select:none}
+.ln.hl{background:#2A3550;box-shadow:inset 3px 0 0 #8EA8F0}
+.cp-f{padding:12px 16px;border-top:1px solid #2C2F36;font-size:13px;color:#B9BAB3;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cp-f a{color:#AFC3F7}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctrl{min-height:44px;padding:0 14px;border-radius:8px;border:1px solid #D4D4CC;background:#fff;font-size:14px}
+.ctrl.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* reverse */
+.path{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono);font-size:12.5px}
+.path span.n{padding:3px 8px;border-radius:6px;background:#F1F1EC}
+.path span.n.end{background:var(--ink);color:#fff}
+.path span.arr{color:var(--muted)}
+
+/* consent modal */
+.overlay{position:fixed;inset:0;background:rgba(22,24,29,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+.overlay.on{display:flex}
+.modal{width:min(600px,100%);background:#fff;border-radius:14px;padding:26px 28px;display:flex;flex-direction:column;gap:16px;max-height:90vh;overflow:auto}
+.modal label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:500}
+.modal select{min-height:44px;border:1px solid #D4D4CC;border-radius:8px;padding:0 10px;font:inherit;background:#fff}
+.payload{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.payload div{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:12.5px}
+.payload div:last-child{border-bottom:0}
+.note{font-size:13px;color:var(--muted)}
+
+@media (max-width:760px){
+  header{padding:12px 16px} main{padding:20px 16px 56px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .row{grid-template-columns:1fr;gap:4px}
+  .codepanel{position:static}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="2" aria-hidden="true"><path d="M7 3c0 6 10 6 10 12s-10 6-10 6"/><path d="M17 3c0 6-10 6-10 12s10 6 10 6"/></svg>
+    CodeDNA
+  </div>
+  <div class="repo"><b>acme-shop</b><span class="pill">main @ 3f9c2a1</span></div>
+  <nav class="tabs" aria-label="Main">
+    <button data-go="overview" class="on">Overview</button>
+    <button data-go="page">Pages</button>
+  </nav>
+  <div class="search">
+    <label for="q" class="sr">Search actions</label>
+    <input id="q" type="search" autocomplete="off" placeholder="Search actions — try “order”, “coupon”, “login”">
+    <div class="results" id="results"></div>
+  </div>
+  <button class="hbtn" id="aiBtn" type="button">AI narration: Off</button>
+  <div class="menu">
+    <button class="hbtn" id="advBtn" type="button" aria-expanded="false">Advanced tools ▾</button>
+    <div class="menu-list" id="advList">
+      <div>Architecture graph<small>Scoped to a trace or module, never whole-repo</small></div>
+      <div>Module &amp; route explorer<small>Former Features workspace</small></div>
+      <div>Diagnostics<small>What the analyzer could and couldn’t run</small></div>
+      <div>Export traces (JSON)<small>Also available to AI tools via MCP</small></div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ 1 · OVERVIEW ============ -->
+<section class="screen on" id="s-overview" style="flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <h1>acme-shop</h1>
+    <p style="margin:0;max-width:760px;color:var(--ink2);font-size:17px">An online store built with Next.js: customers browse products, manage a cart, check out and view their orders; staff manage the catalogue.</p>
+    <p style="margin:0;font-size:13px;color:var(--muted)">From <a href="#">README.md</a> · Next.js 15 App Router · React · Prisma</p>
+  </div>
+
+  <div class="stats">
+    <div class="card stat"><b>14</b><span>pages</span></div>
+    <div class="card stat"><b>31</b><span>user actions</span></div>
+    <div class="card stat"><b>9</b><span>API routes</span></div>
+    <div class="card stat" style="border:1px dashed #D9897F"><b style="color:var(--gap)">4</b><span>actions with gaps</span></div>
+  </div>
+
+  <div class="card" style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h2 style="font-size:16px">How much of this app CodeDNA can explain</h2><span class="note">31 actions</span></div>
+    <div class="bar" role="img" aria-label="22 proven end to end, 5 include best-guess steps, 4 have gaps">
+      <div style="flex:22;background:#0F766E"></div>
+      <div style="flex:5;background:#E0A458"></div>
+      <div style="flex:4;background:repeating-linear-gradient(45deg,#F3C7C1 0 6px,#FBE7E4 6px 12px)"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px;color:var(--ink2)">
+      <span><b>22</b> proven end to end</span><span><b>5</b> include best-guess steps</span><span><b>4</b> have gaps CodeDNA can’t follow</span>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card wide" style="overflow:hidden">
+      <div style="padding:18px 24px;border-bottom:1px solid #ECECE6;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h2>Start with a page</h2><span class="note">Pick a screen to see everything a user can do there</span>
+      </div>
+      <div id="pageRows"></div>
+    </div>
+    <div class="side">
+      <div class="card" style="padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+        <h2 style="font-size:16px">Where CodeDNA gets stuck</h2>
+        <div id="gapList" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div class="card" style="padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+        <h2 style="font-size:16px">How CodeDNA knows</h2>
+        <div class="legend">
+          <div><span class="b proven">PROVEN</span>Confirmed by the TypeScript compiler</div>
+          <div><span class="b fw">FRAMEWORK</span>Follows a Next.js / React rule</div>
+          <div><span class="b guess">BEST GUESS</span>Matched by name or URL text</div>
+          <div><span class="b ai">AI READING</span>Plain-English interpretation, not proof</div>
+          <div><span class="b gap">GAP</span>CodeDNA can’t follow this step</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 · PAGE ACTION INVENTORY ============ -->
+<section class="screen" id="s-page" style="flex-direction:column;gap:22px">
+  <div class="crumb"><button data-go="overview">Pages</button> / <span class="mono" style="color:var(--ink)">/checkout</span></div>
+  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 class="mono" style="font-weight:500;font-size:30px">/checkout</h1>
+      <p style="margin:0;color:var(--ink2)">5 things a user can do on this page · <span class="mono" style="font-size:13px">app/checkout/page.tsx</span></p>
+    </div>
+    <div class="filters" role="group" aria-label="Filter actions" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="on" data-f="all">All 5</button>
+      <button data-f="data">Changes data 2</button>
+      <button data-f="gap">Has gaps 1</button>
+    </div>
+  </div>
+  <div id="groups" style="display:flex;flex-direction:column;gap:18px"></div>
+  <p class="note" style="margin:0">Actions are found from the code itself (event handlers, form actions, links), so this list is complete for what CodeDNA supports. Anything it can’t follow is shown as a gap, never left out.</p>
+</section>
+
+<!-- ============ 3 · ACTION TRACE ============ -->
+<section class="screen" id="s-trace" style="flex-direction:column;gap:20px">
+  <div class="crumb"><button data-go="overview">Pages</button> / <button data-go="page" class="mono">/checkout</button> / <span style="color:var(--ink)">Submit order</span></div>
+  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;align-items:flex-end">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <h1>Submit order</h1>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px;color:var(--ink2)">
+        7 steps · <span class="b proven">4 proven</span><span class="b fw">2 framework</span><span class="b gap">1 gap</span>
+        <span class="note" style="margin-left:6px">Static analysis of commit 3f9c2a1 — nothing was executed.</span>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="ctrl" id="prev" type="button">← Previous</button>
+      <span id="counter" class="note" style="min-width:70px;text-align:center">Step 1 of 7</span>
+      <button class="ctrl primary" id="next" type="button">Next →</button>
+      <button class="ctrl" id="share" type="button">Copy link</button>
+    </div>
+  </div>
+  <div class="trace">
+    <div class="steps" id="steps"></div>
+    <aside class="codepanel" aria-label="Source for the selected step">
+      <div class="cp-h"><span id="cpFile"></span><span id="cpTier"></span></div>
+      <div class="cp-body" id="cpBody"></div>
+      <div class="cp-f"><span id="cpWhy"></span><a href="#" id="cpRev">Who else reaches this? →</a></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ 4 · WHO REACHES THIS ============ -->
+<section class="screen" id="s-reverse" style="flex-direction:column;gap:22px">
+  <div class="crumb"><button data-go="overview">Overview</button> / Who reaches this?</div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h1>Who reaches <span class="mono" style="font-weight:500">calculateTotal()</span>?</h1>
+    <p style="margin:0;color:var(--ink2)"><span class="mono" style="font-size:13px">lib/pricing.ts:22</span> · 4 user actions reach this function, plus 1 caller CodeDNA can’t resolve.</p>
+  </div>
+  <div class="card" style="padding:16px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#FFFDF6;border-color:#EBDDB8">
+    <b style="font-size:14px">Changing this function affects:</b>
+    <span class="chip">/checkout</span><span class="chip">/cart</span><span class="chip">/admin/products</span>
+    <span class="note">— 3 pages, 4 actions</span>
+  </div>
+  <div class="card" id="revList" style="overflow:hidden"></div>
+</section>
+
+</main>
+
+<!-- ============ 5 · CONSENT MODAL ============ -->
+<div class="overlay" id="consent" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+  <div class="modal">
+    <h2 id="cTitle" style="font-size:22px">Turn on AI narration?</h2>
+    <p style="margin:0;color:var(--ink2)">AI rewrites traces in plain English. It can only describe steps CodeDNA already found — it can’t add steps. Its text is always marked <span class="b ai">AI READING</span>.</p>
+    <label>Model provider
+      <select><option>Local model (runs on this machine)</option><option>Your own API key — Anthropic</option><option>Your own API key — OpenAI</option></select>
+    </label>
+    <div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:6px">What will be sent for this trace</div>
+      <div class="payload">
+        <div><span>CheckoutForm.tsx · lines 44–52</span><span>310 tokens</span></div>
+        <div><span>lib/orders/actions.ts · lines 10–48</span><span>940 tokens</span></div>
+        <div><span>lib/pricing.ts · lines 20–31</span><span>220 tokens</span></div>
+        <div><span>lib/payments/index.ts · lines 8–16</span><span>180 tokens</span></div>
+        <div><span>Trace structure (step list)</span><span>450 tokens</span></div>
+      </div>
+      <p class="note" style="margin:6px 0 0">≈ 2.1k tokens · nothing else from the repository · results cached for this commit</p>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="ctrl" id="cCancel" type="button">Keep off</button>
+      <button class="ctrl primary" id="cOk" type="button">Turn on for this repo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- data ---------- */
+const pages=[
+  {path:'/',desc:'Home and featured products',n:3,s:'All proven',c:'var(--proven)'},
+  {path:'/products/[slug]',desc:'Product detail',n:4,s:'All proven',c:'var(--proven)'},
+  {path:'/cart',desc:'Cart and quantities',n:4,s:'1 best guess',c:'var(--guess)'},
+  {path:'/checkout',desc:'Address, payment, place order',n:5,s:'1 gap',c:'var(--gap)'},
+  {path:'/account/login',desc:'Sign in and sign up',n:3,s:'All proven',c:'var(--proven)'},
+  {path:'/account/orders',desc:'Order history',n:2,s:'All proven',c:'var(--proven)'},
+  {path:'/admin/products',desc:'Catalogue management',n:6,s:'2 gaps',c:'var(--gap)'}
+];
+const gaps=[
+  ['Pay with card · /checkout','Payment provider is chosen at runtime','lib/payments/index.ts:12'],
+  ['Bulk import · /admin/products','Request URL is built from a variable','app/admin/products/Import.tsx:57'],
+  ['Export CSV · /admin/products','Handler loaded with dynamic import()','app/admin/products/Toolbar.tsx:31'],
+  ['Live chat · every page','Third-party script, no source in repo','app/layout.tsx:40']
+];
+const groups=[
+  {comp:'CheckoutForm',file:'app/checkout/CheckoutForm.tsx',acts:[
+    {name:'Submit order',trig:'<form action={placeOrder}> · line 48',fx:['validates OrderSchema','charges payment','writes Order','redirects /orders/[id]'],t:'gap',label:'1 GAP',data:true,trace:true},
+    {name:'Apply coupon',trig:'onClick={applyCoupon} · line 72',fx:['POST /api/coupons','updates total'],t:'guess',label:'BEST GUESS',data:false}
+  ]},
+  {comp:'AddressFields',file:'app/checkout/AddressFields.tsx',acts:[
+    {name:'Use saved address',trig:'onChange={selectAddress} · line 19',fx:['reads Address','fills form (local state)'],t:'proven',label:'PROVEN',data:false}
+  ]},
+  {comp:'CheckoutHeader',file:'app/checkout/CheckoutHeader.tsx',acts:[
+    {name:'Back to cart',trig:'<Link href="/cart"> · line 11',fx:['navigates /cart'],t:'fw',label:'FRAMEWORK',data:false},
+    {name:'Sign out',trig:'<form action={signOut}> · line 24',fx:['clears session cookie','redirects /'],t:'proven',label:'PROVEN',data:true}
+  ]}
+];
+const tierName={proven:'PROVEN',fw:'FRAMEWORK',guess:'BEST GUESS',gap:'GAP'};
+const steps=[
+  {title:'Customer submits the checkout form',t:'fw',code:'<form action={placeOrder}>',file:'app/checkout/CheckoutForm.tsx',start:44,hl:48,
+   plain:'Submitting the form calls the server action placeOrder with the form data.',
+   ai:'When the customer presses “Place order”, the browser sends the address and cart details straight to the server — no separate API call is written by hand.',
+   why:'React form action → Next.js server action (framework rule)',
+   lines:['export function CheckoutForm({ cart }: Props) {','  const [state, formAction] = useActionState(placeOrder, null)','','  return (','    <form action={formAction} className="space-y-6">','      <AddressFields errors={state?.errors} />','      <PaymentSection />','      <button type="submit">Place order</button>','    </form>']},
+  {title:'Validates the order details',t:'proven',code:'OrderSchema.safeParse(formData)',file:'lib/orders/actions.ts',start:10,hl:14,
+   plain:'The form data is checked against OrderSchema.',
+   ai:'Before anything else, the server checks the address and quantities are present and well-formed, and sends field errors back to the form if not.',
+   why:'Resolved call: placeOrder → OrderSchema.safeParse',
+   branch:{cond:'if (!parsed.success)',a:'Invalid → return field errors',b:'Valid → continue'},
+   lines:["'use server'",'','export async function placeOrder(_: unknown, formData: FormData) {','  const raw = Object.fromEntries(formData)','  const parsed = OrderSchema.safeParse(raw)','  if (!parsed.success) {','    return { errors: parsed.error.flatten().fieldErrors }','  }']},
+  {title:'Checks the customer is signed in',t:'proven',code:'await auth()',file:'lib/orders/actions.ts',start:17,hl:19,
+   plain:'The current session is loaded; without one the customer is redirected to /account/login.',
+   ai:'Guest checkout isn’t supported: anyone without a session is sent to the login page first.',
+   why:'Resolved call: placeOrder → auth (lib/auth.ts)',
+   branch:{cond:'if (!session)',a:'Not signed in → redirect /account/login',b:'Signed in → continue'},
+   lines:['  // session','','  const session = await auth()','  if (!session) redirect(\'/account/login\')','  const cart = await getCart(session.user.id)']},
+  {title:'Calculates the total',t:'proven',code:'calculateTotal(cart.items, parsed.data.coupon)',file:'lib/pricing.ts',start:20,hl:22,
+   plain:'calculateTotal adds item prices and applies the coupon, if one was given.',
+   ai:'The price is recalculated on the server from the cart — the total shown in the browser isn’t trusted.',
+   why:'Resolved call: placeOrder → calculateTotal',
+   rev:true,
+   lines:['import { COUPONS } from \'./coupons\'','','export function calculateTotal(items: CartItem[], code?: string) {','  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)','  const discount = code ? COUPONS[code]?.(subtotal) ?? 0 : 0','  return Math.max(0, subtotal - discount)','}']},
+  {title:'Charges the payment',t:'gap',code:'getPaymentProvider().charge(total)',file:'lib/payments/index.ts',start:8,hl:12,
+   plain:'CodeDNA can’t tell which payment code runs: the provider is picked from the PAYMENT_PROVIDER environment variable. Possible implementations: lib/payments/stripe.ts, lib/payments/mock.ts.',
+   ai:'Likely charges the card through Stripe in production and a mock in development — but this depends on configuration CodeDNA can’t see.',
+   why:'Gap: implementation chosen at runtime',
+   lines:['const providers = { stripe: stripeProvider, mock: mockProvider }','','export function getPaymentProvider() {','  const key = process.env.PAYMENT_PROVIDER as keyof typeof providers','  return providers[key]','}']},
+  {title:'Saves the order',t:'proven',code:'prisma.order.create({ data })',file:'lib/orders/actions.ts',start:38,hl:41,
+   plain:'A new Order row is written with the customer, items, total and payment reference.',
+   ai:'Only after a successful charge is the order stored, so a failed payment never leaves a half-created order.',
+   why:'Resolved call → Prisma client (database write: Order)',
+   lines:['  const payment = await getPaymentProvider().charge(total)','','  const order = await prisma.order.create({','    data: { userId: session.user.id, items: cart.items, total, paymentId: payment.id },','  })']},
+  {title:'Refreshes order history and redirects',t:'fw',code:"revalidatePath('/account/orders'); redirect(`/orders/${order.id}`)",file:'lib/orders/actions.ts',start:45,hl:46,
+   plain:'The cached order-history page is refreshed and the customer is sent to the new order’s page.',
+   ai:'The customer lands on their order confirmation, and their order list is already up to date.',
+   why:'Next.js cache + navigation APIs (framework rule)',
+   lines:['  await clearCart(session.user.id)','  revalidatePath(\'/account/orders\')','  redirect(`/orders/${order.id}`)','}']}
+];
+const rev=[
+  {act:'Submit order',page:'/checkout',t:'proven',path:['<form action>','placeOrder','calculateTotal']},
+  {act:'Apply coupon',page:'/checkout',t:'guess',path:['onClick','fetch(\'/api/coupons\')','POST app/api/coupons/route.ts','calculateTotal'],note:'URL matched to route by text'},
+  {act:'Change quantity',page:'/cart',t:'proven',path:['onChange','updateQty','getCartSummary','calculateTotal']},
+  {act:'Preview price',page:'/admin/products',t:'proven',path:['onClick','previewPrice','calculateTotal']}
+];
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let ai=false, cur=0;
+
+function go(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+name));
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.go===(name==='overview'||name==='reverse'?'overview':'page')));
+  window.scrollTo(0,0);
+}
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]'); if(g){e.preventDefault();go(g.dataset.go)}});
+
+/* ---------- overview ---------- */
+$('#pageRows').innerHTML=pages.map(p=>`<button class="row" data-go="page"><span class="mono" style="font-weight:500;font-size:14px">${esc(p.path)}</span><span style="color:#4A4D55;font-size:14px">${p.desc}</span><span style="font-size:14px">${p.n} actions</span><span style="font-size:13px;color:${p.c}">${p.s}</span></button>`).join('');
+$('#gapList').innerHTML=gaps.map(g=>`<div class="gapcard"><b style="font-size:14px">${g[0]}</b><span style="font-size:13px;color:#4A4D55">${g[1]}</span><span class="mono" style="font-size:12px;color:var(--muted)">${g[2]}</span></div>`).join('');
+
+/* ---------- page inventory ---------- */
+function renderGroups(f){
+  $('#groups').innerHTML=groups.map(g=>{
+    const acts=g.acts.filter(a=>f==='all'||(f==='data'&&a.data)||(f==='gap'&&a.t==='gap'));
+    if(!acts.length) return '';
+    return `<div class="card"><div class="grp-h"><h2 class="mono" style="font-size:15px;font-weight:500">&lt;${g.comp}&gt;</h2><span class="mono note">${g.file}</span></div>`+
+      acts.map(a=>`<div class="act"><div style="flex:2 1 240px;min-width:0"><b style="font-size:16px">${a.name}</b><div class="mono note" style="font-size:12px">${esc(a.trig)}</div></div>
+      <div style="flex:3 1 300px;min-width:0;display:flex;flex-wrap:wrap;gap:6px">${a.fx.map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>
+      <span class="b ${a.t}" style="flex:0 0 110px">${a.label}</span>
+      <button class="go" data-go="trace">Trace →</button></div>`).join('')+`</div>`;
+  }).join('');
+}
+renderGroups('all');
+document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.filters button').forEach(x=>x.classList.remove('on'));b.classList.add('on');renderGroups(b.dataset.f)});
+
+/* ---------- trace ---------- */
+const branchPick={};
+function renderSteps(){
+  $('#steps').className='steps'+(ai?' ai-on':'');
+  $('#steps').innerHTML=steps.map((s,i)=>{
+    const last=i===steps.length-1;
+    const br=s.branch?`<div class="branch"><span class="cond">${esc(s.branch.cond)}</span>
+      <button data-br="${i}" data-v="a" class="${branchPick[i]==='a'?'on':''}">${esc(s.branch.a)}</button>
+      <button data-br="${i}" data-v="b" class="${branchPick[i]!=='a'?'on':''}">${esc(s.branch.b)}</button></div>`:'';
+    return `<div class="step ${i===cur?'on':''} ${s.t==='gap'?'isgap':''}" data-i="${i}" role="button" tabindex="0" aria-label="Step ${i+1}: ${esc(s.title)}">
+      <div class="rail"><div class="dot">${i+1}</div>${last?'':`<div class="line ${s.t==='gap'||(steps[i+1]&&steps[i+1].t==='gap')?'dash':''}"></div>`}</div>
+      <div class="sbody"><div class="stitle"><b>${esc(s.title)}</b><span class="b ${s.t}">${tierName[s.t]}</span></div>
+      <div class="scode">${esc(s.code)}</div>
+      <div class="splain">${esc(s.plain)}</div>
+      <div class="aitext"><span class="b ai" style="margin-right:6px">AI READING</span>${esc(s.ai)}</div>${br}</div></div>`;
+  }).join('');
+  const s=steps[cur];
+  $('#cpFile').textContent=s.file+' · line '+s.hl;
+  $('#cpTier').textContent=tierName[s.t];
+  $('#cpBody').innerHTML=s.lines.map((l,k)=>{const n=s.start+k;return `<div class="ln ${n===s.hl?'hl':''}"><i>${n}</i>${esc(l)}</div>`}).join('');
+  $('#cpWhy').textContent=s.why;
+  $('#cpRev').style.visibility=s.rev?'visible':'hidden';
+  $('#counter').textContent=`Step ${cur+1} of ${steps.length}`;
+  $('#prev').disabled=cur===0; $('#next').disabled=cur===steps.length-1;
+}
+$('#steps').addEventListener('click',e=>{
+  const b=e.target.closest('[data-br]'); if(b){branchPick[b.dataset.br]=b.dataset.v; renderSteps(); return;}
+  const st=e.target.closest('.step'); if(st){cur=+st.dataset.i; renderSteps();}
+});
+$('#steps').addEventListener('keydown',e=>{const st=e.target.closest('.step'); if(st&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cur=+st.dataset.i;renderSteps();}});
+$('#prev').onclick=()=>{if(cur>0){cur--;renderSteps()}};
+$('#next').onclick=()=>{if(cur<steps.length-1){cur++;renderSteps()}};
+$('#share').onclick=()=>{$('#share').textContent='Link copied ✓';setTimeout(()=>$('#share').textContent='Copy link',1500)};
+$('#cpRev').onclick=e=>{e.preventDefault();go('reverse')};
+document.addEventListener('keydown',e=>{
+  if(!$('#s-trace').classList.contains('on')||e.target.matches('input,select,textarea'))return;
+  if(e.key==='ArrowRight')$('#next').click(); if(e.key==='ArrowLeft')$('#prev').click();
+});
+renderSteps();
+
+/* ---------- reverse ---------- */
+$('#revList').innerHTML=rev.map(r=>`<div class="act"><div style="flex:1 1 200px"><b>${r.act}</b><div class="mono note" style="font-size:12px">${r.page}</div></div>
+  <div style="flex:4 1 420px;min-width:0" class="path">${r.path.map((p,k)=>`<span class="n ${k===r.path.length-1?'end':''}">${esc(p)}</span>${k<r.path.length-1?'<span class="arr">→</span>':''}`).join('')}${r.note?`<span class="note" style="font-family:inherit;margin-left:6px">(${r.note})</span>`:''}</div>
+  <span class="b ${r.t}" style="flex:0 0 110px">${tierName[r.t]}</span><button class="go" data-go="trace">Trace →</button></div>`).join('')+
+  `<div class="act" style="background:var(--gap-bg)"><div style="flex:1 1 200px"><b style="color:var(--gap)">Unresolved caller</b><div class="mono note" style="font-size:12px">lib/promo.ts:31</div></div>
+  <div style="flex:4 1 420px;font-size:14px;color:var(--ink2)">Called through <span class="mono">pricingStrategies[key]()</span> — the key is only known at runtime, so CodeDNA can’t tell which actions use this path.</div>
+  <span class="b gap" style="flex:0 0 110px">GAP</span></div>`;
+
+/* ---------- search ---------- */
+const index=[
+  {l:'Submit order',p:'/checkout',to:'trace'},{l:'Apply coupon',p:'/checkout',to:'page'},
+  {l:'Use saved address',p:'/checkout',to:'page'},{l:'Sign in',p:'/account/login',to:'page'},
+  {l:'Change quantity',p:'/cart',to:'page'},{l:'Add to cart',p:'/products/[slug]',to:'page'},
+  {l:'calculateTotal()',p:'function · lib/pricing.ts',to:'reverse'}
+];
+$('#q').addEventListener('input',e=>{
+  const v=e.target.value.trim().toLowerCase(), r=$('#results');
+  const m=v?index.filter(x=>(x.l+' '+x.p).toLowerCase().includes(v)||(v.includes('login')&&x.l==='Sign in')):[];
+  r.style.display=m.length?'block':'none';
+  r.innerHTML=m.map(x=>`<button data-go="${x.to}"><span>${esc(x.l)}</span><span class="mono note">${esc(x.p)}</span></button>`).join('');
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('#results').style.display='none'; else if(e.target.closest('.results button')){$('#results').style.display='none';$('#q').value='';}});
+
+/* ---------- advanced menu ---------- */
+$('#advBtn').onclick=e=>{e.stopPropagation();const l=$('#advList'),o=l.style.display==='block';l.style.display=o?'none':'block';$('#advBtn').setAttribute('aria-expanded',!o)};
+document.addEventListener('click',e=>{if(!e.target.closest('.menu')){$('#advList').style.display='none';$('#advBtn').setAttribute('aria-expanded','false')}});
+
+/* ---------- AI consent ---------- */
+$('#aiBtn').onclick=()=>{ if(ai){ai=false;$('#aiBtn').textContent='AI narration: Off';$('#aiBtn').classList.remove('on');renderSteps();} else $('#consent').classList.add('on'); };
+$('#cCancel').onclick=()=>$('#consent').classList.remove('on');
+$('#cOk').onclick=()=>{ai=true;$('#consent').classList.remove('on');$('#aiBtn').textContent='AI narration: On';$('#aiBtn').classList.add('on');renderSteps();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#consent').classList.remove('on')});
+</script>
+</body>
+</html>

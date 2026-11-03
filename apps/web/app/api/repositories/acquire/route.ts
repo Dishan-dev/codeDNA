@@ -173,13 +173,14 @@ export async function POST(request: Request) {
     const result = await acquireRepository((data as { url: string }).url, {
       ...(token ? { token } : {}),
       signal: request.signal,
-      strategy: 'archive',
+      strategy: 'auto',
     });
-    const { analysis, uiFlow } = await runAnalysisWorker(
+    const { analysis, uiFlow, understanding, features, actions } = await runAnalysisWorker(
       result.snapshot,
       request.signal,
+      { complete: result.completeness.complete },
     );
-    return reply({ ...result, analysis, uiFlow }, 200);
+    return reply({ ...result, analysis, uiFlow, understanding, features, actions }, 200);
   } catch (error) {
     if (error instanceof AnalysisWorkerError)
       return reply(

@@ -256,12 +256,21 @@ export function LearningWorkspace({
             </button>
             <button
               type="button"
-              disabled={index === plan.steps.length - 1}
-              onClick={() => setStep(plan.steps[index + 1]!.id)}
+              onClick={() =>
+                index === plan.steps.length - 1
+                  ? complete()
+                  : setStep(plan.steps[index + 1]!.id)
+              }
             >
-              Next
+              {index === plan.steps.length - 1 ? 'Finish' : 'Next'}
             </button>
           </div>
+          {index === plan.steps.length - 1 &&
+            progress.completed.includes(current.id) && (
+              <p role="status">
+                Walkthrough finished. You can revisit any skipped steps.
+              </p>
+            )}
           <p className="learning-note">
             Progress is kept in this Explorer session and is lost when it
             closes. Source evidence is static, not a guarantee of runtime

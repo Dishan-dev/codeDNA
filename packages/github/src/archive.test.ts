@@ -54,6 +54,7 @@ async function setup(files: Record<string, string>) {
             sha: hash('export {}'),
             size: 9,
           },
+          ...Object.entries(files).filter(([name]) => /(?:README\.md|docs\/[^/]+\.md|package\.json)$/.test(name)).map(([name, content]) => ({ path: name.slice('repo/'.length), type: 'blob', mode: '100644', sha: hash(content), size: Buffer.byteLength(content) })),
         ],
       });
     if (url === `https://codeload.github.com/test/repo/tar.gz/${commit}`)
@@ -80,12 +81,32 @@ describe('archive acquisition', () => {
       'a.ts',
       'b.ts',
     ]);
+    expect(result.snapshot.documents).toEqual([{ path: 'README.md', content: 'ignored' }]);
     expect(analyzeSnapshot(result.snapshot).dependencyGraph.edges).toHaveLength(
       1,
     );
     expect(calls).toHaveLength(4);
     expect(calls[3]?.init?.redirect).toBe('manual');
     expect(calls[3]?.init?.headers).toBeUndefined();
+  });
+  it('selects the verified archive for a small repository in auto mode', async () => {
+    const { fetcher, calls } = await setup({
+      'repo/a.ts': source,
+      'repo/b.ts': 'export {}',
+    });
+    const result = await acquireRepository('https://github.com/test/repo', {
+      fetch: fetcher,
+      strategy: 'auto',
+    });
+    expect(result.snapshot.files).toHaveLength(2);
+    expect(calls.some((call) => call.url.includes('codeload.github.com'))).toBe(true);
+  });
+  it('acquires nested documentation and manifests from the pinned archive', async () => {
+    const { fetcher } = await setup({ 'repo/a.ts': source, 'repo/b.ts': 'export {}', 'repo/docs/guide.md': '# Guide', 'repo/packages/api/README.md': '# API', 'repo/package.json': '{"name":"repo"}' });
+    const result = await acquireRepository('https://github.com/test/repo', { fetch: fetcher, strategy: 'archive' });
+    expect(result.snapshot.documents?.map((item) => item.path)).toEqual(['docs/guide.md', 'packages/api/README.md']);
+    expect(result.snapshot.manifests?.map((item) => item.path)).toEqual(['package.json']);
+    expect(analyzeSnapshot(result.snapshot).snapshotId).toBe(result.snapshot.id);
   });
   it.each([
     [{ 'repo/a.ts': 'tampered', 'repo/b.ts': 'export {}' }],

@@ -1,17 +1,38 @@
-﻿'use client';
-import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
+'use client';
+import {
+  Component,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import dynamic from 'next/dynamic';
 import {
-  ArchitectureMap,
-  buildArchitectureOverview,
-  groupDetailGraph,
-} from '@codedna/graph-ui';
+  ArrowUpLeft,
+  ChevronRight,
+  FolderOpen,
+  House,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react';
+import { buildArchitectureOverview } from '@codedna/graph-ui/architecture-overview';
 import type {
   DependencyGraph,
   RepositorySnapshot,
   UIFlowGraph,
+  AnalysisDiagnostic,
+  CapabilityAssessment,
 } from '@codedna/shared';
+import type { RepositoryOverview as OverviewData } from '@codedna/core/repository-overview';
 import { ArchitectureGuide } from './architecture-guide';
+import { RepositoryOverview } from './repository-overview';
+import {
+  graphForFolder,
+  graphForRootFiles,
+  graphForQuestion,
+  type DependencyQuestion,
+} from '@/lib/architecture-guide';
 const Architecture3D = dynamic(
   () =>
     import('@codedna/graph-ui/architecture-3d').then(
@@ -21,6 +42,10 @@ const Architecture3D = dynamic(
     ssr: false,
     loading: () => <p className="architecture-hint">Loading 3D view?</p>,
   },
+);
+const ArchitectureMap = dynamic(
+  () => import('@codedna/graph-ui/architecture-map').then((module) => module.ArchitectureMap),
+  { ssr: false, loading: () => <p className="architecture-hint">Loading focused map…</p> },
 );
 class View3DBoundary extends Component<
   { children: ReactNode },
@@ -48,6 +73,17 @@ export function ArchitectureWorkspace({
   complete,
   selectedId,
   onSelectionChange,
+  diagnostics,
+  onSourceEvidence,
+  onExploreImpact,
+  initialFolderPath,
+  repositoryOverview,
+  understanding,
+  capabilities,
+  repositoryName,
+  onOpenScreen,
+  onLearning,
+  routeDiagnostics,
 }: {
   graph: DependencyGraph;
   snapshot: RepositorySnapshot;
@@ -55,26 +91,95 @@ export function ArchitectureWorkspace({
   complete: boolean;
   selectedId: string | null;
   onSelectionChange: (id: string | null) => void;
+  diagnostics: AnalysisDiagnostic[];
+  onSourceEvidence: (path: string, line: number) => void;
+  onExploreImpact: () => void;
+  initialFolderPath?: string;
+  repositoryOverview: OverviewData;
+  understanding: import('@codedna/shared').RepositoryUnderstanding;
+  capabilities: CapabilityAssessment;
+  repositoryName: string;
+  onOpenScreen: (id: string) => void;
+  onLearning: () => void;
+  routeDiagnostics: number;
 }) {
-  const [view, setView] = useState<'guide' | '2d' | '3d'>('guide');
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState<'none' | 'native' | 'expanded'>(
+    'none',
+  );
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem('codedna-architecture-view');
-      if (saved === '3d' || saved === '2d' || saved === 'guide') setView(saved);
-    } catch {
-      // Storage may be unavailable; keep the in-memory choice.
-    }
+    const onFullscreenChange = () => {
+      setFullscreen((current) =>
+        document.fullscreenElement === workspaceRef.current
+          ? 'native'
+          : current === 'native'
+            ? 'none'
+            : current,
+      );
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () =>
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
+  useEffect(() => {
+    if (fullscreen !== 'expanded') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setFullscreen('none');
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [fullscreen]);
+  const toggleFullscreen = async () => {
+    if (fullscreen === 'native') {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        /* The browser may have already exited. */
+      }
+      return;
+    }
+    if (fullscreen === 'expanded') {
+      setFullscreen('none');
+      return;
+    }
+    const element = workspaceRef.current;
+    if (element?.requestFullscreen && !document.fullscreenElement) {
+      try {
+        await element.requestFullscreen();
+        setFullscreen('native');
+        return;
+      } catch {
+        /* Use the in-page expanded view if fullscreen is unavailable. */
+      }
+    }
+    setFullscreen('expanded');
+  };
+  const [view, setView] = useState<'guide' | '2d' | '3d'>('guide');
+  const [rawGraph, setRawGraph] = useState(false);
   const switchView = (next: 'guide' | '2d' | '3d') => {
     setView(next);
-    try {
-      sessionStorage.setItem('codedna-architecture-view', next);
-    } catch {
-      // Storage may be unavailable; keep the in-memory choice.
-    }
+    if (next === 'guide') setRawGraph(false);
   };
   const [showExternal, setShowExternal] = useState(false);
-  const [directOnly, setDirectOnly] = useState(false);
+  const [question, setQuestion] = useState<DependencyQuestion>('all');
+  useEffect(() => {
+    setQuestion(selectedId ? 'direct' : 'all');
+  }, [selectedId]);
+  const [folderPath, setFolderPath] = useState(initialFolderPath ?? '');
+  const [rootFiles, setRootFiles] = useState(false);
+  const pathParts = folderPath ? folderPath.split('/') : [];
+  const selectedFile = selectedId?.startsWith('file:')
+    ? selectedId.slice(5)
+    : null;
+  const navigateFolder = (path: string, root = false) => {
+    setFolderPath(path);
+    setRootFiles(root);
+    onSelectionChange(null);
+    setQuestion('all');
+  };
   const baseGraph = useMemo(() => {
     if (showExternal) return graph;
     const nodes = graph.nodes.filter((node) => node.kind !== 'external');
@@ -88,32 +193,38 @@ export function ArchitectureWorkspace({
     };
   }, [graph, showExternal]);
   const visibleGraph = useMemo(() => {
-    if (!directOnly || !selectedId) return baseGraph;
-    const ids = new Set([selectedId]);
-    const edges = baseGraph.edges.filter(
-      (edge) => edge.sourceId === selectedId || edge.targetId === selectedId,
-    );
-    for (const edge of edges) {
-      ids.add(edge.sourceId);
-      ids.add(edge.targetId);
-    }
-    return {
-      ...baseGraph,
-      nodes: baseGraph.nodes.filter((node) => ids.has(node.id)),
-      edges,
-    };
-  }, [baseGraph, directOnly, selectedId]);
+    return graphForQuestion(baseGraph, selectedId, question);
+  }, [baseGraph, question, selectedId]);
   const overview = useMemo(
     () => buildArchitectureOverview(visibleGraph),
     [visibleGraph],
   );
-  const [groupId, setGroupId] = useState<string | null>(null);
-  const [showFiles, setShowFiles] = useState(false);
-  const group = overview.groups.find((item) => item.id === groupId);
-  const detail = useMemo(
-    () => (group ? groupDetailGraph(visibleGraph, group) : visibleGraph),
-    [visibleGraph, group],
+  const folderGraph = useMemo(
+    () =>
+      rootFiles
+        ? graphForRootFiles(visibleGraph)
+        : graphForFolder(visibleGraph, folderPath),
+    [visibleGraph, folderPath, rootFiles],
   );
+  const folderSelectedId = folderGraph.nodes.some(
+    (node) => node.id === selectedId,
+  )
+    ? selectedId
+    : null;
+  useEffect(() => {
+    if (!selectedId) return;
+    const node = graph.nodes.find(
+      (item) => item.id === selectedId && item.kind !== 'external',
+    );
+    if (node) {
+      setFolderPath(
+        node.label.includes('/')
+          ? node.label.slice(0, node.label.lastIndexOf('/'))
+          : '',
+      );
+      setRootFiles(!node.label.includes('/'));
+    }
+  }, [selectedId, graph]);
   useEffect(() => {
     if (
       selectedId &&
@@ -123,48 +234,81 @@ export function ArchitectureWorkspace({
     )
       setShowExternal(true);
   }, [selectedId, graph]);
-  useEffect(() => {
-    if (
-      selectedId &&
-      (!showFiles ||
-        (group && !detail.nodes.some((node) => node.id === selectedId)))
-    ) {
-      setShowFiles(true);
-      setGroupId(null);
-    }
-  }, [selectedId, showFiles, group, detail]);
   const openGroup = (id: string | null) => {
-    if (id && overview.groups.some((item) => item.id === id)) {
-      setGroupId(id);
-      setShowFiles(true);
+    const item = overview.groups.find((group) => group.id === id);
+    if (
+      item &&
+      snapshot.files.some((file) => file.path.startsWith(`${item.label}/`))
+    ) {
+      navigateFolder(item.label);
+    } else if (item?.id.startsWith('group:root:')) {
+      navigateFolder('', true);
     }
   };
+  const scopedOverview = useMemo(
+    () => buildArchitectureOverview(folderGraph),
+    [folderGraph],
+  );
+  const mapHasFileFocus = !!folderSelectedId && !rawGraph;
+  const groupedMap = !rawGraph && !mapHasFileFocus;
+  const mapGraph = rawGraph
+    ? baseGraph
+    : mapHasFileFocus
+      ? graphForQuestion(
+          baseGraph,
+          folderSelectedId,
+          question === 'all' ? 'direct' : question,
+        )
+      : folderPath || rootFiles
+        ? scopedOverview.graph
+        : overview.graph;
+  const mapTooLarge =
+    !rawGraph && (mapGraph.nodes.length > 100 || mapGraph.edges.length > 250);
   return (
-    <div className="architecture-workspace">
+    <div
+      ref={workspaceRef}
+      className={`architecture-workspace ${fullscreen === 'expanded' ? 'architecture-workspace--expanded' : ''}`}
+    >
       <div className="architecture-view-controls">
         <div>
           <strong>
             {view === 'guide'
-              ? 'Codebase guide'
-              : showFiles
-                ? group
-                  ? group.label
-                  : 'File dependencies'
-                : 'Repository overview'}
+              ? 'Understand the repository'
+              : rawGraph
+                ? 'Advanced raw dependency graph'
+                : selectedId
+                  ? 'File relationships'
+                  : folderPath || rootFiles
+                    ? 'Module connections'
+                    : 'Repository modules'}
           </strong>
           <span>
             {view === 'guide'
-              ? 'Understand the structure and follow the evidence'
-              : showFiles
-                ? group
-                  ? `${group.fileIds.length} files or packages · ${group.internalEdges} internal dependencies; direct neighbors included`
-                  : directOnly && selectedId
-                    ? 'Selected file and its direct connections'
-                    : 'Every analyzed file and package'
-                : 'Groups follow repository paths · arrows point from importer to dependency'}
+              ? 'Explore the structure, then open a file or a focused visualization.'
+              : rawGraph
+                ? 'Showing all analyzed files and dependencies.'
+                : 'Only detected static relationships are shown.'}
           </span>
         </div>
         <div className="architecture-view-buttons">
+          <button
+            type="button"
+            className="architecture-fullscreen-button"
+            aria-pressed={fullscreen !== 'none'}
+            aria-label={
+              fullscreen === 'none'
+                ? 'Open fullscreen architecture workspace'
+                : 'Exit fullscreen architecture workspace'
+            }
+            onClick={() => void toggleFullscreen()}
+          >
+            {fullscreen === 'none' ? (
+              <Maximize2 size={14} aria-hidden="true" />
+            ) : (
+              <Minimize2 size={14} aria-hidden="true" />
+            )}
+            {fullscreen === 'none' ? 'Fullscreen' : 'Exit fullscreen'}
+          </button>
           <button
             type="button"
             aria-pressed={view === 'guide'}
@@ -179,63 +323,142 @@ export function ArchitectureWorkspace({
           >
             2D
           </button>
-          <button
-            type="button"
-            aria-pressed={view === '3d'}
-            onClick={() => switchView('3d')}
-          >
-            3D
-          </button>
-          {view !== 'guide' && (
-            <button
-              type="button"
-              aria-pressed={directOnly}
-              disabled={!selectedId}
-              onClick={() => setDirectOnly(!directOnly)}
-            >
-              {directOnly ? 'Show all connections' : 'Direct connections'}
-            </button>
-          )}
-          {view !== 'guide' && (
+          {/* The 3D view (packages/graph-ui architecture-3d) is kept but no longer linked from navigation. */}
+          {view !== 'guide' && <details className="architecture-advanced"><summary>Map options</summary><div>
             <button
               type="button"
               aria-pressed={showExternal}
               onClick={() => {
                 setShowExternal(!showExternal);
-                setGroupId(null);
               }}
             >
               {showExternal ? 'Hide packages' : 'Show packages'}
             </button>
-          )}
-          {view === '2d' && (
+
             <button
               type="button"
-              aria-pressed={!showFiles}
+              aria-pressed={rawGraph}
               onClick={() => {
-                setShowFiles(false);
-                setGroupId(null);
-                onSelectionChange(null);
+                setRawGraph(!rawGraph);
+                setQuestion('all');
               }}
             >
-              Overview
+              {rawGraph ? 'Return to focused view' : 'Advanced / Raw graph'}
             </button>
-          )}
-          {view === '2d' && (
+          </div></details>}
+        </div>
+      </div>
+      {view !== 'guide' && (
+        <div className="architecture-question">
+          <label htmlFor="dependency-question">
+            What would you like to see?
+          </label>
+          <select
+            id="dependency-question"
+            value={question}
+            onChange={(event) =>
+              setQuestion(event.target.value as DependencyQuestion)
+            }
+          >
+            <option value="all">All connections in this view</option>
+            <option value="direct" disabled={!selectedId}>
+              Selected file: direct connections
+            </option>
+            <option value="uses" disabled={!selectedId}>
+              Selected file: what it uses
+            </option>
+            <option value="dependents" disabled={!selectedId}>
+              Selected file: what uses it
+            </option>
+          </select>
+          <span>
+            {selectedId
+              ? 'Select another file to follow its connections.'
+              : 'Select a file to explore a focused question.'}
+          </span>
+        </div>
+      )}
+      <div className="guide-location architecture-location">
+        <div className="guide-location-header">
+          <span>
+            <FolderOpen size={14} aria-hidden="true" /> CURRENT LOCATION
+          </span>
+          {(folderPath || rootFiles || selectedFile) && (
             <button
               type="button"
-              aria-pressed={showFiles}
-              onClick={() => {
-                setGroupId(null);
-                setShowFiles(true);
-              }}
+              className="guide-up"
+              onClick={() =>
+                selectedFile
+                  ? onSelectionChange(null)
+                  : navigateFolder(pathParts.slice(0, -1).join('/'))
+              }
             >
-              All files
+              <ArrowUpLeft size={14} aria-hidden="true" />{' '}
+              {selectedFile ? 'Back to folder' : 'Up one folder'}
             </button>
           )}
         </div>
+        <nav
+          className="guide-breadcrumbs"
+          aria-label="Architecture folder path"
+        >
+          <button
+            type="button"
+            aria-current={
+              !folderPath && !rootFiles && !selectedFile
+                ? 'location'
+                : undefined
+            }
+            onClick={() => navigateFolder('')}
+          >
+            <House size={13} aria-hidden="true" /> Repository
+          </button>
+          {rootFiles && (
+            <span>
+              <ChevronRight size={14} aria-hidden="true" />
+              <button
+                type="button"
+                aria-current={!selectedFile ? 'location' : undefined}
+                onClick={() => navigateFolder('', true)}
+              >
+                Root files
+              </button>
+            </span>
+          )}
+          {pathParts.map((part, index) => (
+            <span key={pathParts.slice(0, index + 1).join('/')}>
+              <ChevronRight size={14} aria-hidden="true" />
+              <button
+                type="button"
+                aria-current={
+                  index === pathParts.length - 1 && !selectedFile
+                    ? 'location'
+                    : undefined
+                }
+                onClick={() =>
+                  navigateFolder(pathParts.slice(0, index + 1).join('/'))
+                }
+              >
+                {part}
+              </button>
+            </span>
+          ))}
+          {selectedFile && (
+            <span>
+              <ChevronRight size={14} aria-hidden="true" />
+              <span className="architecture-file-crumb" aria-current="location">
+                {selectedFile.split('/').at(-1)}
+              </span>
+            </span>
+          )}
+        </nav>
+        <p>
+          {folderPath
+            ? 'Showing this folder and its directly connected files in the maps.'
+            : 'Explore a folder in the guide or select a group in a map.'}
+        </p>
       </div>
-      {view === '2d' && !showFiles && (
+      {view !== 'guide' && groupedMap && (
         <p className="architecture-hint">
           Select a group to inspect its files and direct connections. Group
           names describe paths, not inferred responsibilities. External packages
@@ -244,50 +467,97 @@ export function ArchitectureWorkspace({
       )}
       <div className="architecture-map-area">
         {view === 'guide' ? (
-          <ArchitectureGuide
-            snapshot={snapshot}
-            graph={graph}
-            uiFlow={uiFlow}
-            complete={complete}
-            onSelect={onSelectionChange}
-          />
+          folderPath || rootFiles ? (
+            <ArchitectureGuide
+              key={`${folderPath}:${rootFiles}`}
+              snapshot={snapshot}
+              graph={graph}
+              uiFlow={uiFlow}
+              complete={complete}
+              onSelect={onSelectionChange}
+              path={folderPath}
+              onPathChange={navigateFolder}
+              selectedId={selectedId}
+              diagnostics={diagnostics}
+              onSourceEvidence={onSourceEvidence}
+              onExploreImpact={onExploreImpact}
+              rootFiles={rootFiles}
+              onVisualize={() => switchView('2d')}
+              moduleDescription={understanding.modules.find((module) => module.path === folderPath)?.description.text}
+            />
+          ) : (
+            <RepositoryOverview
+              overview={repositoryOverview}
+              understanding={understanding}
+              capabilities={capabilities}
+              name={repositoryName}
+              onModule={(path) => navigateFolder(path, !path)}
+              onScreen={onOpenScreen}
+              onLearning={onLearning}
+              onEvidence={onSourceEvidence}
+              routeDiagnostics={routeDiagnostics}
+            />
+          )
+        ) : mapTooLarge ? (
+          <div className="workspace-state" role="status">
+            <h2>This selection has too many connections for a clear map</h2>
+            <p>
+              {mapGraph.nodes.length} nodes and {mapGraph.edges.length}{' '}
+              connections are available. Explore a smaller folder or file in
+              Guide, or choose Advanced / Raw graph to inspect everything.
+            </p>
+            <button
+              className="guide-action"
+              type="button"
+              onClick={() => switchView('guide')}
+            >
+              Return to Guide
+            </button>
+          </div>
         ) : view === '3d' ? (
           <View3DBoundary>
             <Architecture3D
-              graph={visibleGraph}
-              selectedId={selectedId}
-              onSelectionChange={onSelectionChange}
+              graph={mapGraph}
+              {...(groupedMap
+                ? {
+                    edgeEvidence: (folderPath || rootFiles
+                      ? scopedOverview
+                      : overview
+                    ).edgeEvidence,
+                    evidenceGraph: graph,
+                    onEvidence: onSourceEvidence,
+                  }
+                : { evidenceGraph: graph, onEvidence: onSourceEvidence })}
+              selectedId={groupedMap ? null : folderSelectedId}
+              onSelectionChange={groupedMap ? openGroup : onSelectionChange}
+              onFolderNavigate={(path) => {
+                if (
+                  snapshot.files.some((file) =>
+                    file.path.startsWith(`${path}/`),
+                  )
+                )
+                  navigateFolder(path);
+              }}
             />
           </View3DBoundary>
         ) : (
           <ArchitectureMap
-            graph={showFiles ? detail : overview.graph}
-            selectedId={showFiles ? selectedId : null}
-            onSelectionChange={showFiles ? onSelectionChange : openGroup}
+            graph={mapGraph}
+            {...(groupedMap
+              ? {
+                  edgeEvidence: (folderPath || rootFiles
+                    ? scopedOverview
+                    : overview
+                  ).edgeEvidence,
+                  evidenceGraph: graph,
+                  onEvidence: onSourceEvidence,
+                }
+              : { evidenceGraph: graph, onEvidence: onSourceEvidence })}
+            selectedId={groupedMap ? null : folderSelectedId}
+            onSelectionChange={groupedMap ? openGroup : onSelectionChange}
           />
         )}
       </div>
-      {view === '2d' && !showFiles && (
-        <div
-          className="architecture-group-list"
-          aria-label="Architecture groups"
-        >
-          {overview.groups.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              onClick={() => openGroup(item.id)}
-            >
-              <strong>{item.label}</strong>
-              <span>
-                {item.fileIds.length}{' '}
-                {item.id.includes('External%20packages') ? 'packages' : 'files'}{' '}
-                · {item.internalEdges} internal dependencies
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

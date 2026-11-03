@@ -1,0 +1,86 @@
+/*
+ * CodeDNA design tokens (from docs/design/codedna-ui-prototype.html).
+ * IBM Plex is used when installed; no web font is downloaded, so system fonts are the fallback.
+ * Tier colours meet 4.5:1 against their badge backgrounds in both themes.
+ */
+:root {
+  --dna-bg: #f6f6f3;
+  --dna-card: #ffffff;
+  --dna-ink: #16181d;
+  --dna-ink-2: #3a3d45;
+  --dna-muted: #5c5f68;
+  --dna-line: #e2e2dc;
+  --dna-line-2: #f0f0eb;
+  --dna-field: #d4d4cc;
+  --dna-field-bg: #fafaf8;
+  --dna-chip: #f1f1ec;
+  --dna-hover: #fafaf7;
+  --dna-on-ink: #ffffff;
+  --dna-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --dna-focus: #1e46a8;
+
+  --tier-proven-bg: #e3f3f0;
+  --tier-proven: #0b5e57;
+  --tier-fw-bg: #e6ecfa;
+  --tier-fw: #1e46a8;
+  --tier-guess-bg: #fcefdf;
+  --tier-guess: #7f4305;
+  --tier-ai-bg: #f0e9fc;
+  --tier-ai: #5b21b6;
+  --tier-gap: #a12a1c;
+  --tier-gap-line: #c2493b;
+  --tier-gap-bg: #fff8f7;
+  --tier-gap-badge-bg: #ffffff;
+  --bar-proven: #0f766e;
+  --bar-guess: #e0a458;
+  --bar-gap-a: #f3c7c1;
+  --bar-gap-b: #fbe7e4;
+
+  --code-bg: #16181d;
+  --code-ink: #e6e6e1;
+  --code-muted: #b9bab3;
+  --code-gutter: #8a8c94;
+  --code-line: #2c2f36;
+  --code-hl: #2a3550;
+  --code-hl-edge: #8ea8f0;
+  --code-link: #afc3f7;
+
+  --dna-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dna-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --dna-radius: 12px;
+  --dna-touch: 44px;
+}
+
+:root[data-theme='dark'] {
+  --dna-bg: #0f1115;
+  --dna-card: #171a20;
+  --dna-ink: #ecedef;
+  --dna-ink-2: #c9cbd1;
+  --dna-muted: #a2a6b0;
+  --dna-line: #2a2e36;
+  --dna-line-2: #20242b;
+  --dna-field: #3a3f48;
+  --dna-field-bg: #13161b;
+  --dna-chip: #23272f;
+  --dna-hover: #1c2027;
+  --dna-on-ink: #0f1115;
+  --dna-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --dna-focus: #a9bfff;
+
+  --tier-proven-bg: #0e2e2b;
+  --tier-proven: #7fdccf;
+  --tier-fw-bg: #172449;
+  --tier-fw: #b3c7ff;
+  --tier-guess-bg: #3a2610;
+  --tier-guess: #f4c085;
+  --tier-ai-bg: #2a1e47;
+  --tier-ai: #d2bfff;
+  --tier-gap: #ffa597;
+  --tier-gap-line: #d9675a;
+  --tier-gap-bg: #2a1714;
+  --tier-gap-badge-bg: #171a20;
+  --bar-proven: #2bb3a3;
+  --bar-guess: #d79a4c;
+  --bar-gap-a: #7a3a33;
+  --bar-gap-b: #4a2420;
+}

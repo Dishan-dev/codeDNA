@@ -37,6 +37,8 @@ export function ExplorerSessionLoader({
         typeof stored !== 'object' ||
         !('snapshot' in stored) ||
         !('uiFlow' in stored) ||
+        !('understanding' in stored) ||
+        !('features' in stored) ||
         !('result' in stored)
       )
         throw new Error('Invalid session');
@@ -72,6 +74,9 @@ export function ExplorerSessionLoader({
       snapshot={session.snapshot}
       result={session.result}
       uiFlow={session.uiFlow}
+      understanding={session.understanding}
+      features={session.features}
+      actions={session.actions}
       repositoryName={session.repositoryName}
       source={session.source}
       completeness={session.completeness}

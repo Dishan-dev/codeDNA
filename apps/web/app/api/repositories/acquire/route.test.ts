@@ -68,8 +68,15 @@ describe('acquisition endpoint', () => {
     );
     const body = await response.json();
     expect(response.status).toBe(200);
+    expect(acquireRepository).toHaveBeenCalledWith(
+      'https://github.com/a/b',
+      expect.objectContaining({ strategy: 'auto' }),
+    );
     expect(body.analysis.snapshotId).toBe(snapshot.id);
     expect(body.uiFlow.graph.nodes[0].routePath).toBe('/');
+    expect(body.understanding.snapshotId).toBe(snapshot.id);
+    expect(body.features.features.some((item: { kind: string }) => item.kind === 'route')).toBe(true);
+    expect(body.actions.schemaVersion).toBe('1.0');
     expect(body.snapshot).toEqual(snapshot);
   });
   it('maps adapter errors to safe public responses', async () => {

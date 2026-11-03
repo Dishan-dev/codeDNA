@@ -7,11 +7,22 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { generateLearningPlan } from '@codedna/core/learning';
-import { UIFlowMap } from '@codedna/graph-ui';
+import { assessCapabilities } from '@codedna/core/capabilities';
+import {
+  summarizeRepository,
+  type RepositoryOverview as OverviewData,
+} from '@codedna/core/repository-overview';
+import type { ActionIndex } from '@codedna/shared';
+import { FlowOverview } from './flow-overview';
+import { AdvancedMenu, ActionSearch, type AdvancedItem } from './flow-header';
+import { readFlowLocation, screenTab, tracePermalink, writeFlowLocation, type FlowLocation, type Screen } from '@/lib/flow-state';
+import { DiscoverWorkspace } from './discover-workspace';
+import { FeatureWorkspace } from './feature-workspace';
 import type { UIFlowAnalysis } from '@codedna/core';
-import { screenForFile } from '@/lib/explorer-session';
+import { learningSessionKey, screenForFile } from '@/lib/explorer-session';
 import type { ExplorerSession } from '@/lib/explorer-session';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   ArrowLeft,
   Box,
@@ -20,15 +31,17 @@ import {
   ChevronRight,
   CircleHelp,
   FileCode2,
-  GitBranch,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Play,
   Radar,
   Search,
   Sparkles,
+  Sun,
+  Moon,
   Waypoints,
   X,
 } from 'lucide-react';
@@ -36,10 +49,12 @@ import type {
   AnalysisResult,
   RepositorySnapshot,
   LearningPlan,
+  CapabilityAssessment,
+  DependencyGraph,
+  RepositoryUnderstanding,
+  FeatureDiscovery,
 } from '@codedna/shared';
 import { Brand } from './brand';
-import { ImpactWorkspace } from './impact-workspace';
-import { ArchitectureWorkspace } from './architecture-workspace';
 import { FileList } from './file-list';
 import { FileRelationships } from './file-relationships';
 import { filePracticeSuggestions } from '@/lib/practice-suggestions';
@@ -48,21 +63,60 @@ import {
   emptyLearningProgress,
   type LearningProgress,
 } from './learning-workspace';
-import { Badge, Button, Input, Panel, Tooltip } from './ui';
+import { Button, Input, Panel, Tooltip } from './ui';
 
-type Mode = 'Architecture' | 'UI Flow' | 'Impact Analysis' | 'Learning Mode';
+const BehaviorTools = dynamic(() => import('./behavior-tools').then((module) => module.BehaviorTools), { loading: () => <p className="workspace-state">Preparing behavior tools…</p> });
+const DiagnosticsView = dynamic(() => import('./diagnostics-view').then((module) => module.DiagnosticsView), { loading: () => <p className="workspace-state">Collecting diagnostics…</p> });
+const SimulationWorkspace = dynamic(() => import('./simulation-workspace').then((module) => module.SimulationWorkspace), { loading: () => <p className="workspace-state">Preparing static walkthrough…</p> });
+const ImpactWorkspace = dynamic(() => import('./impact-workspace').then((module) => module.ImpactWorkspace), { loading: () => <p className="workspace-state">Preparing impact analysis…</p> });
+const ArchitectureWorkspace = dynamic(() => import('./architecture-workspace').then((module) => module.ArchitectureWorkspace), { loading: () => <p className="workspace-state">Preparing architecture…</p> });
+const PageInventory = dynamic(() => import('./page-inventory').then((module) => module.PageInventory), { loading: () => <p className="workspace-state">Preparing the page…</p> });
+const ActionTrace = dynamic(() => import('./action-trace').then((module) => module.ActionTrace), { loading: () => <p className="workspace-state">Preparing the trace…</p> });
+const ReachView = dynamic(() => import('./reach-view').then((module) => module.ReachView), { loading: () => <p className="workspace-state">Finding callers…</p> });
+const RouteExplorer = dynamic(() => import('./route-explorer').then((module) => module.RouteExplorer), { loading: () => <p className="workspace-state">Preparing routes…</p> });
+type Mode = 'Discover' | 'Architecture' | 'Features' | 'Static Walkthrough' | 'UI Flow' | 'Impact Analysis' | 'Learning Mode';
 const modes = [
+  { name: 'Discover', icon: Search },
   { name: 'Architecture', icon: LayoutDashboard },
+  { name: 'Features', icon: Braces },
+  { name: 'Static Walkthrough', icon: Play },
   { name: 'UI Flow', icon: Waypoints },
   { name: 'Impact Analysis', icon: Radar },
   { name: 'Learning Mode', icon: Sparkles },
 ] as const;
+const emptyDependencyGraph: DependencyGraph = {
+  schemaVersion: '1.0',
+  nodes: [],
+  edges: [],
+};
 export type WorkspaceState =
   | { status: 'empty' }
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; snapshot: RepositorySnapshot; result?: AnalysisResult };
 
+function HeaderTabs({ screen, onOverview, onPages }: { screen: Screen; onOverview: () => void; onPages: () => void }) {
+  const tab = screenTab(screen);
+  return (
+    <nav className="flow-tabs" aria-label="Main">
+      <button type="button" aria-current={tab === 'Overview' ? 'page' : undefined} onClick={onOverview}>Overview</button>
+      <button type="button" aria-current={tab === 'Pages' ? 'page' : undefined} onClick={onPages}>Pages</button>
+    </nav>
+  );
+}
+const ADVANCED_ITEMS: AdvancedItem[] = [
+  { id: 'Architecture', label: 'Architecture graph', hint: 'Module map and dependency graph' },
+  { id: 'Features', label: 'Module & route explorer', hint: 'Former Features workspace' },
+  { id: 'UI Flow', label: 'Routes & navigation', hint: 'Detected screens and links' },
+  { id: 'Static Walkthrough', label: 'Function walkthrough', hint: 'Walk any exported function' },
+  { id: 'Impact Analysis', label: 'File impact', hint: 'Which files and screens import a file' },
+  { id: 'Learning Mode', label: 'Learning mode', hint: 'A guided tour of the structure' },
+  { id: 'Discover', label: 'Discover modules', hint: 'Documentation, modules and symbols' },
+  { id: 'diagnostics', label: 'Diagnostics', hint: 'What the analyzer could and couldn’t run' },
+  { id: 'stories', label: 'Behavior stories', hint: 'Earlier story player' },
+  { id: 'ask', label: 'Ask CodeDNA', hint: 'Questions answered from detected behaviors' },
+  { id: 'export', label: 'Export traces (JSON)', hint: 'Download the page and action analysis' },
+];
 function ModeTabs({
   mode,
   onChange,
@@ -70,6 +124,9 @@ function ModeTabs({
   mode: Mode;
   onChange: (mode: Mode) => void;
 }) {
+  useEffect(() => {
+    document.getElementById(`mode-${modes.findIndex((item) => item.name === mode)}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [mode]);
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
@@ -93,6 +150,7 @@ function ModeTabs({
           key={name}
           id={`mode-${index}`}
           role="tab"
+          aria-label={name === 'UI Flow' ? 'Routes & Features' : name === 'Learning Mode' ? 'Learning' : name}
           aria-selected={mode === name}
           aria-controls="workspace-panel"
           tabIndex={mode === name ? 0 : -1}
@@ -100,7 +158,13 @@ function ModeTabs({
           onKeyDown={(e) => navigate(e, index)}
         >
           <Icon size={16} />
-          <span>{name}</span>
+          <span>
+            {name === 'UI Flow'
+              ? 'Routes & Features'
+              : name === 'Learning Mode'
+                ? 'Learning'
+                : name}
+          </span>
         </button>
       ))}
     </div>
@@ -117,6 +181,24 @@ export function Workspace({
   frameworkDetected,
   impactComplete,
   onImpactInspect,
+  onSourceEvidence,
+  onExploreImpact,
+  capabilities,
+  overview,
+  understanding,
+  features,
+  featureSelectedId,
+  onFeatureSelection,
+  onDiscoverModule,
+  onFeatureArchitecture,
+  onStartSimulation,
+  onSimulationFeature,
+  onBackFeatures,
+  onDocumentEvidence,
+  repositoryName,
+  initialFolderPath,
+  onOpenScreen,
+  onOpenOverviewMode,
   learningPlan,
   learningProgress,
   onLearningProgress,
@@ -133,6 +215,24 @@ export function Workspace({
   frameworkDetected: boolean;
   impactComplete: boolean;
   onImpactInspect: (id: string) => void;
+  onSourceEvidence: (path: string, line: number) => void;
+  onExploreImpact: () => void;
+  capabilities: CapabilityAssessment;
+  overview: OverviewData;
+  understanding: RepositoryUnderstanding;
+  features: FeatureDiscovery;
+  featureSelectedId: string | null;
+  onFeatureSelection: (id: string) => void;
+  onDiscoverModule: (path: string) => void;
+  onFeatureArchitecture: (path: string) => void;
+  onStartSimulation: (id: string) => void;
+  onSimulationFeature: (id: string) => void;
+  onBackFeatures: () => void;
+  onDocumentEvidence: (path: string, line: number) => void;
+  repositoryName: string;
+  initialFolderPath: string;
+  onOpenScreen: (id: string) => void;
+  onOpenOverviewMode: (mode: 'Architecture' | 'Learning Mode') => void;
   learningPlan: LearningPlan;
   learningProgress: LearningProgress;
   onLearningProgress: (progress: LearningProgress) => void;
@@ -173,15 +273,29 @@ export function Workspace({
         <p>Choose a repository to begin exploring.</p>
       </div>
     );
-  if (mode === 'Architecture' && state.result)
+  if (mode === 'Discover') return <DiscoverWorkspace understanding={understanding} features={features} onModule={onDiscoverModule} onFeature={(id) => { onFeatureSelection(id); }} onFile={onDocumentEvidence} />;
+  if (mode === 'Features') return <FeatureWorkspace discovery={features} selectedId={featureSelectedId} onSelect={onFeatureSelection} onSource={onSourceEvidence} onArchitecture={onFeatureArchitecture} onSimulation={onStartSimulation} />;
+  if (mode === 'Static Walkthrough') return <SimulationWorkspace discovery={features} snapshot={state.snapshot} featureId={featureSelectedId} complete={impactComplete} onFeature={onSimulationFeature} onBackFeatures={onBackFeatures} onBackArchitecture={onFeatureArchitecture} />;
+  if (mode === 'Architecture')
     return (
       <ArchitectureWorkspace
-        graph={state.result.dependencyGraph}
+        graph={state.result?.dependencyGraph ?? emptyDependencyGraph}
         snapshot={state.snapshot}
         uiFlow={uiFlow.graph}
         complete={impactComplete}
         selectedId={selectedId}
         onSelectionChange={onSelectionChange}
+        diagnostics={state.result?.diagnostics ?? []}
+        onSourceEvidence={onSourceEvidence}
+        onExploreImpact={onExploreImpact}
+        initialFolderPath={initialFolderPath}
+        repositoryOverview={overview}
+        understanding={understanding}
+        capabilities={capabilities}
+        repositoryName={repositoryName}
+        onOpenScreen={onOpenScreen}
+        onLearning={() => onOpenOverviewMode('Learning Mode')}
+        routeDiagnostics={uiFlow.diagnostics.length}
       />
     );
   if (mode === 'Learning Mode')
@@ -206,52 +320,24 @@ export function Workspace({
     );
   if (mode === 'UI Flow')
     return (
-      <UIFlowMap
-        graph={uiFlow.graph}
-        diagnostics={uiFlow.diagnostics}
+      <RouteExplorer
+        analysis={state.result}
+        uiFlow={uiFlow}
         selectedId={uiSelectedId}
-        onSelectionChange={onUISelection}
+        onSelect={onUISelection}
+        onSource={onSourceEvidence}
         frameworkDetected={frameworkDetected}
       />
     );
-  return (
-    <div className="workspace-state">
-      <div className="workspace-illustration" aria-hidden="true">
-        <div className="orbit orbit-one" />
-        <div className="orbit orbit-two" />
-        <span className="orbit-point p1" />
-        <span className="orbit-point p2" />
-        <span className="orbit-point p3" />
-        <div className="workspace-symbol">
-          <GitBranch size={27} />
-        </div>
-      </div>
-      <div className="state-eyebrow">{mode.toUpperCase()} / WORKSPACE</div>
-      <h2>
-        {mode === 'Architecture'
-          ? 'A little space to see the big picture.'
-          : `${mode} is on the way.`}
-      </h2>
-      <p>
-        {state.result
-          ? 'This mode is not available yet. Switch to Architecture to explore file dependencies.'
-          : 'This is a bundled example repository. Select a file to inspect its source; the interactive graph is coming in the next phase.'}
-      </p>
-      <div className="state-pills">
-        <span>
-          <i /> SAMPLE REPOSITORY
-        </span>
-        <span>
-          <i /> GRAPH COMING SOON
-        </span>
-      </div>
-    </div>
-  );
+  return null;
 }
 export function Explorer({
   snapshot,
   result,
   uiFlow,
+  understanding,
+  features,
+  actions,
   repositoryName,
   source,
   completeness,
@@ -260,15 +346,110 @@ export function Explorer({
   snapshot: RepositorySnapshot;
   result?: AnalysisResult;
   uiFlow: UIFlowAnalysis;
+  understanding: RepositoryUnderstanding;
+  features: FeatureDiscovery;
+  actions?: ActionIndex | undefined;
   repositoryName: string;
   source: ExplorerSession['source'];
   completeness: ExplorerSession['completeness'];
   acquisitionDiagnostics: ExplorerSession['acquisitionDiagnostics'];
 }) {
-  const [mode, setMode] = useState<Mode>('Architecture');
+  const [mode, setMode] = useState<Mode>('Discover');
+  const [location, setLocation] = useState<FlowLocation>({ screen: 'overview' });
+  const screen = location.screen;
+  const navigate = useCallback((next: FlowLocation, replace = false) => {
+    setLocation(next);
+    const url = `${window.location.pathname}${writeFlowLocation(window.location.search, next)}`;
+    if (replace) window.history.replaceState(window.history.state, '', url);
+    else {
+      window.history.pushState(window.history.state, '', url);
+      document.getElementById('workspace-panel')?.scrollTo?.({ top: 0 });
+    }
+  }, []);
+  useEffect(() => {
+    const read = () => {
+      const next = readFlowLocation(window.location.search);
+      setLocation(next);
+      if (next.screen === 'advanced' && modes.some((item) => item.name === next.mode)) setMode(next.mode as Mode);
+    };
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, []);
+  useEffect(() => {
+    if (location.screen === 'advanced' && location.mode !== mode) navigate({ screen: 'advanced', mode }, true);
+  }, [location, mode, navigate]);
+  const openAdvanced = useCallback((nextMode?: Mode) => {
+    const target = nextMode ?? mode;
+    setMode(target);
+    navigate({ screen: 'advanced', mode: target });
+  }, [mode, navigate]);
+  const capabilities = useMemo(
+    () =>
+      assessCapabilities(snapshot, result, uiFlow, {
+        complete: completeness.complete,
+        skippedFiles: completeness.skippedFiles,
+        documentationAnalyzed: true,
+        symbolsAnalyzed: true,
+        staticWalkthroughReady: features.features.length > 0,
+      }),
+    [
+      snapshot,
+      result,
+      uiFlow,
+      completeness.complete,
+      completeness.skippedFiles,
+      features.features.length,
+    ],
+  );
+  const [architecturePath, setArchitecturePath] = useState('');
+  const overview = useMemo(
+    () =>
+      summarizeRepository(
+        snapshot,
+        result,
+        uiFlow.graph,
+        completeness.complete,
+      ),
+    [snapshot, result, uiFlow.graph, completeness.complete],
+  );
+  const [featureSelectedId, setFeatureSelectedId] = useState<string | null>(null);
   const [learningProgress, setLearningProgress] = useState<LearningProgress>(
     emptyLearningProgress,
   );
+  const progressKey = `codedna.learning.v1:${learningSessionKey(source, repositoryName, snapshot.id, snapshot.revision)}`;
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(progressKey);
+      if (!stored) return;
+      const value: unknown = JSON.parse(stored);
+      if (
+        value &&
+        typeof value === 'object' &&
+        'completed' in value &&
+        Array.isArray(value.completed) &&
+        value.completed.every((item) => typeof item === 'string') &&
+        'answers' in value &&
+        value.answers &&
+        typeof value.answers === 'object' &&
+        !Array.isArray(value.answers) &&
+        'currentStepId' in value &&
+        (value.currentStepId === null ||
+          typeof value.currentStepId === 'string')
+      )
+        setLearningProgress(value as LearningProgress);
+    } catch {
+      /* Session storage is optional. */
+    }
+  }, [progressKey]);
+  const saveLearningProgress = (progress: LearningProgress) => {
+    setLearningProgress(progress);
+    try {
+      sessionStorage.setItem(progressKey, JSON.stringify(progress));
+    } catch {
+      /* Continue in memory when storage is unavailable. */
+    }
+  };
   const learningPlan = useMemo(
     () =>
       generateLearningPlan(result, uiFlow.graph, {
@@ -277,13 +458,30 @@ export function Explorer({
       }),
     [result, uiFlow, completeness.complete],
   );
-  const [left, setLeft] = useState(true);
-  const [right, setRight] = useState(true);
+  const [left, setLeft] = useState(false);
+  const [right, setRight] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('codedna.theme') === 'dark') setTheme('dark');
+    } catch {
+      /* Theme preference is optional. */
+    }
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem('codedna.theme', theme);
+    } catch {
+      /* Continue with the in-memory preference. */
+    }
+  }, [theme]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sourceEvidence, setSourceEvidence] = useState<{
     path: string;
     line: number;
   } | null>(null);
+  const [documentEvidence, setDocumentEvidence] = useState<{ path: string; line: number } | null>(null);
   const [fileHistory, setFileHistory] = useState<{
     ids: string[];
     index: number;
@@ -308,6 +506,8 @@ export function Explorer({
           : null;
   const selected =
     snapshot.files.find((file) => file.path === activePath) ?? null;
+  const selectedDocument = documentEvidence ? [...(snapshot.documents ?? []), ...(snapshot.manifests ?? [])].find((item) => item.path === documentEvidence.path) : undefined;
+  const documentLine = documentEvidence?.line;
   const onUISelection = useCallback((id: string | null) => {
     setUISelectedId(id);
     setUIFilePath(null);
@@ -364,6 +564,17 @@ export function Explorer({
           .flatMap((node) => node.boundaries ?? [])
           .find((boundary) => boundary.path === selected.path)
       : undefined;
+  const openSource = useCallback((path: string, line: number) => {
+    onSelectionChange(`file:${path}`);
+    setSourceEvidence({ path, line });
+    setMode('Architecture');
+    navigate({ screen: 'advanced', mode: 'Architecture' });
+  }, [onSelectionChange, navigate]);
+  const openArchitecture = useCallback((path: string) => {
+    if (path) onSelectionChange(`file:${path}`);
+    setMode('Architecture');
+    navigate({ screen: 'advanced', mode: 'Architecture' });
+  }, [onSelectionChange, navigate]);
   const practiceSuggestions = useMemo(
     () =>
       result && selectedId
@@ -383,53 +594,74 @@ export function Explorer({
       setRight(false);
     }
   }, []);
+  const commit = actions?.commit;
+  const openPage = useCallback((page: string) => navigate({ screen: 'page', page }), [navigate]);
+  const openPages = useCallback(() => navigate({ screen: 'pages' }), [navigate]);
+  const openOverview = useCallback(() => navigate({ screen: 'overview' }), [navigate]);
+  const openTrace = useCallback((action: string, step?: string) => navigate({ screen: 'trace', action, ...(step ? { step } : {}), ...(commit ? { commit } : {}) }), [navigate, commit]);
+  const openReach = useCallback((symbol: string) => navigate({ screen: 'reach', symbol }), [navigate]);
+  const openGap = useCallback((actionId: string, file: string, line: number) => {
+    const action = actions?.actions.find((item) => item.id === actionId);
+    const step = actions?.traces.find((trace) => trace.id === action?.traceId)?.steps.find((item) => item.tier === 'gap' && item.file === file && item.line === line);
+    openTrace(actionId, step?.id);
+  }, [actions, openTrace]);
+  const exportTraces = useCallback(() => {
+    if (!actions) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(actions, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${repositoryName.replace(/[^\w.-]+/g, '-')}-traces.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, [actions, repositoryName]);
+  const chooseAdvanced = useCallback((id: string) => {
+    if (id === 'export') exportTraces();
+    else if (id === 'diagnostics' || id === 'stories' || id === 'ask') navigate({ screen: id });
+    else if (modes.some((item) => item.name === id)) openAdvanced(id as Mode);
+  }, [exportTraces, navigate, openAdvanced]);
+  const staleLink = !!location.commit && location.commit !== commit;
   const state: WorkspaceState = result
     ? { status: 'ready', snapshot, result }
     : { status: 'ready', snapshot };
   return (
     <div className="explorer">
-      <header className="explorer-header">
-        <div className="explorer-header-left">
+      <header className="explorer-header flow-header">
+        <div className="flow-header__identity">
           <Brand />
-          <span className="header-divider" />
           <Link href="/" className="back-link">
             <ArrowLeft size={14} /> Home
           </Link>
-          <span className="header-divider" />
-          <div className="repo-identity">
-            <span className="repo-icon">
-              <GitBranch size={15} />
+          <span className="flow-header__repo">
+            <strong>{repositoryName}</strong>
+            <span className="flow-pill" title={commit ? `Commit ${commit}` : 'This snapshot has no recorded commit'}>
+              {commit ? commit.slice(0, 7) : source === 'sample' ? 'sample' : 'no commit'}
             </span>
-            <div>
-              <small>REPOSITORY</small>
-              <strong>{repositoryName}</strong>
-            </div>
-            <ChevronDown size={14} />
-          </div>
-          <Badge className="sample-badge">
-            {source === 'sample' ? 'SAMPLE' : 'GITHUB'}
-          </Badge>
-        </div>
-        <div className="explorer-header-right">
-          <span className="header-note">
-            <span className="status-dot" />{' '}
-            {source === 'sample' ? 'LOCAL EXAMPLE' : 'PUBLIC REPOSITORY'}
           </span>
-          <Tooltip label="About this workspace">
-            <a
-              href="#workspace-help"
-              className="icon-link"
-              aria-label="About this workspace"
-            >
-              <CircleHelp size={18} />
-            </a>
-          </Tooltip>
+        </div>
+        <HeaderTabs screen={screen} onOverview={openOverview} onPages={openPages} />
+        <ActionSearch
+          index={actions}
+          onHit={(hit) => {
+            if (hit.actionId) openTrace(hit.actionId);
+            else if (hit.symbolId) openReach(hit.symbolId);
+            else if (hit.pageId) openPage(hit.pageId);
+          }}
+        />
+        <div className="flow-header__tools">
+          <button type="button" className="flow-hbtn" disabled aria-describedby="ai-narration-note">
+            AI narration: Off
+          </button>
+          <span id="ai-narration-note" className="sr-only">AI narration is not available yet. Every trace is fully described without it.</span>
+          <AdvancedMenu items={ADVANCED_ITEMS} onSelect={chooseAdvanced} />
+          <Button size="icon" variant="ghost" aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </Button>
         </div>
       </header>
-      <div className="explorer-nav">
+      {screen === 'advanced' && <div className="explorer-nav">
         <ModeTabs mode={mode} onChange={setMode} />
-        <div className="panel-controls">
-          <Tooltip label={left ? 'Hide files' : 'Show files'}>
+        {mode !== 'Static Walkthrough' && <div className="panel-controls">
+          {mode !== 'Features' && <Tooltip label={left ? 'Hide files' : 'Show files'}>
             <Button
               size="icon"
               variant="ghost"
@@ -447,7 +679,7 @@ export function Explorer({
                 <PanelLeftOpen size={17} />
               )}
             </Button>
-          </Tooltip>
+          </Tooltip>}
           <Tooltip label={right ? 'Hide inspector' : 'Show inspector'}>
             <Button
               size="icon"
@@ -467,12 +699,12 @@ export function Explorer({
               )}
             </Button>
           </Tooltip>
-        </div>
-      </div>
+        </div>}
+      </div>}
       <div
-        className={`explorer-body ${!left ? 'without-left' : ''} ${!right ? 'without-right' : ''}`}
+        className={`explorer-body ${screen !== 'advanced' || !left || mode === 'Features' || mode === 'Static Walkthrough' ? 'without-left' : ''} ${screen !== 'advanced' || !right || mode === 'Static Walkthrough' ? 'without-right' : ''}`}
       >
-        {left && (
+        {screen === 'advanced' && left && mode !== 'Features' && mode !== 'Static Walkthrough' && (
           <Panel className="file-panel" aria-label="Repository files">
             <div className="panel-heading">
               <div>
@@ -556,6 +788,47 @@ export function Explorer({
             </div>
           </Panel>
         )}
+        {screen !== 'advanced' ? (
+          <section id="workspace-panel" className="workspace flow-workspace" aria-label="CodeDNA" tabIndex={-1}>
+            {(!completeness.complete || actions?.partial) && (
+              <p className="flow-notice" role="status" data-testid="partial-notice">
+                This analysis is partial
+                {!completeness.complete ? `: the snapshot is missing ${completeness.skippedFiles || 'some'} file${completeness.skippedFiles === 1 ? '' : 's'}` : ': an analysis limit was reached'}. Pages, actions and steps may be missing. Details are under Advanced tools › Diagnostics.
+              </p>
+            )}
+            {staleLink && (
+              <p className="flow-notice" role="status">
+                This link was made for commit {location.commit}. You are viewing {commit ? `commit ${commit}` : 'a snapshot without a recorded commit'}, so steps may differ.
+              </p>
+            )}
+            {state.status !== 'ready' ? (
+              <p className="workspace-state" role="status">Preparing your workspace…</p>
+            ) : !actions && ['overview', 'pages', 'page', 'trace', 'reach'].includes(screen) ? (
+              <div className="flow-page">
+                <section className="flow-card flow-empty" role="status">
+                  <h1>Pages and actions aren’t available for this session</h1>
+                  <p>This repository was imported before page and action analysis existed. Import it again to see its pages, actions and traces. The advanced tools still work.</p>
+                  <button type="button" className="flow-button" onClick={() => openAdvanced()}>Open advanced tools</button>
+                </section>
+              </div>
+            ) : screen === 'overview' && actions ? (
+              <FlowOverview repositoryName={repositoryName} understanding={understanding} index={actions} onPage={openPage} onGap={openGap} onAdvanced={() => openAdvanced()} />
+            ) : (screen === 'pages' || screen === 'page') && actions ? (
+              <PageInventory index={actions} pageId={screen === 'page' ? location.page : undefined} onPage={openPage} onPages={openPages} onTrace={(id) => openTrace(id)} />
+            ) : screen === 'trace' && actions ? (
+              <ActionTrace index={actions} snapshot={snapshot} actionId={location.action ?? ''} stepId={location.step}
+                onStep={(step) => navigate({ ...location, step }, true)} onPage={openPage} onPages={openPages} onReach={openReach}
+                permalink={(step) => tracePermalink(`${window.location.origin}${window.location.pathname}`, window.location.search, location.action ?? '', step, commit)} />
+            ) : screen === 'reach' && actions ? (
+              <ReachView index={actions} symbolId={location.symbol} features={features} onTrace={openTrace} onOverview={openOverview} />
+            ) : screen === 'stories' || screen === 'ask' ? (
+              <BehaviorTools screen={screen} snapshot={snapshot} understanding={understanding} features={features} complete={completeness.complete}
+                onScreen={(next) => navigate({ screen: next })} onSource={openSource} onArchitecture={openArchitecture} onAdvanced={() => openAdvanced()} />
+            ) : screen === 'diagnostics' ? (
+              <DiagnosticsView capabilities={capabilities} diagnostics={result?.diagnostics ?? []} uiFlow={uiFlow} actions={actions} acquisition={acquisitionDiagnostics} onEvidence={openSource} />
+            ) : null}
+          </section>
+        ) : (
         <section
           id="workspace-panel"
           className="workspace"
@@ -565,11 +838,10 @@ export function Explorer({
         >
           <div className="workspace-top">
             <div>
-              <span>EXPLORER</span>
+              <button type="button" onClick={() => setMode('Discover')}>Discover</button>
               <ChevronRight size={13} />
               <strong>{mode}</strong>
             </div>
-            <Badge>PREVIEW</Badge>
           </div>
           {mode === 'Architecture' &&
             result &&
@@ -682,6 +954,40 @@ export function Explorer({
             mode={mode}
             selectedId={selectedId}
             onSelectionChange={onSelectionChange}
+            onSourceEvidence={(path, line) => {
+              onSelectionChange(`file:${path}`);
+              setSourceEvidence({ path, line });
+              if (mode === 'UI Flow') setMode('Architecture');
+            }}
+            onExploreImpact={() => setMode('Impact Analysis')}
+            overview={overview}
+            understanding={understanding}
+            features={features}
+            featureSelectedId={featureSelectedId}
+            onFeatureSelection={(id) => { setFeatureSelectedId(id); setMode('Features'); }}
+            onStartSimulation={(id) => { setFeatureSelectedId(id); setMode('Static Walkthrough'); }}
+            onSimulationFeature={setFeatureSelectedId}
+            onBackFeatures={() => setMode('Features')}
+            onDiscoverModule={(path) => { setArchitecturePath(path); setMode('Architecture'); }}
+            onFeatureArchitecture={(path) => { if (path) onSelectionChange(`file:${path}`); setMode('Architecture'); }}
+            onDocumentEvidence={(path, line) => {
+              if ((snapshot.documents ?? []).some((item) => item.path === path) || (snapshot.manifests ?? []).some((item) => item.path === path)) {
+                setDocumentEvidence({ path, line });
+                setRight(true);
+              } else {
+                onSelectionChange(`file:${path}`);
+                setSourceEvidence({ path, line });
+                setMode('Architecture');
+              }
+            }}
+            capabilities={capabilities}
+            repositoryName={repositoryName}
+            initialFolderPath={architecturePath}
+            onOpenScreen={(id) => {
+              onUISelection(id);
+              setMode('UI Flow');
+            }}
+            onOpenOverviewMode={(nextMode) => setMode(nextMode)}
             uiFlow={uiFlow}
             uiSelectedId={uiSelectedId}
             onUISelection={onUISelection}
@@ -689,7 +995,7 @@ export function Explorer({
             impactComplete={completeness.complete}
             learningPlan={learningPlan}
             learningProgress={learningProgress}
-            onLearningProgress={setLearningProgress}
+            onLearningProgress={saveLearningProgress}
             onLearningInspect={(file) => onSelectionChange(`file:${file}`)}
             onLearningExplore={(nextMode, file, screenId) => {
               if (nextMode === 'UI Flow' && screenId) onUISelection(screenId);
@@ -715,7 +1021,8 @@ export function Explorer({
             </span>
           </div>
         </section>
-        {right && (
+        )}
+        {screen === 'advanced' && right && mode !== 'Static Walkthrough' && (
           <Panel className="inspector" aria-label="Context inspector">
             <div className="panel-heading">
               <div>
@@ -731,7 +1038,7 @@ export function Explorer({
                 <PanelRightClose size={16} />
               </Button>
             </div>
-            {mode === 'UI Flow' && selectedScreen ? (
+            {mode === 'Discover' && selectedDocument ? <div className="inspector-content"><div className="inspector-label">DOCUMENT EVIDENCE <Button size="icon" variant="ghost" aria-label="Close document evidence" onClick={() => setDocumentEvidence(null)}><X size={14} /></Button></div><strong>{selectedDocument.path}</strong><p>Untrusted repository documentation at revision {snapshot.revision ?? 'unknown'}.</p><pre className="source-preview"><code>{selectedDocument.content.split('\n').map((line, index) => <span key={index} className={index + 1 === documentLine ? 'source-line-highlight' : undefined}>{line}{'\n'}</span>)}</code></pre></div> : mode === 'UI Flow' && selectedScreen ? (
               <div className="inspector-content">
                 <div className="inspector-label">
                   SCREEN{' '}
@@ -933,17 +1240,36 @@ export function Explorer({
                     )}
                   </div>
                 )}
-                <div className="inspector-rule" />
-                <div className="inspector-label">
-                  SOURCE{' '}
-                  <span>{source === 'sample' ? 'EXAMPLE' : 'REPOSITORY'}</span>
-                </div>
+                <details className="guided-secondary" key={`${selected.path}:${sourceEvidence?.line ?? 0}`} open={sourceEvidence?.path === selected.path}>
+                  <summary>Source file {source === 'sample' ? '(example)' : ''}</summary>
                 <pre className="source-preview">
-                  <code>{selected.content}</code>
+                  <code>
+                    {sourceEvidence?.path === selected.path
+                      ? selected.content.split('\n').map((line, index) => (
+                          <span
+                            key={index}
+                            id={
+                              index + 1 === sourceEvidence.line
+                                ? 'source-evidence-line'
+                                : undefined
+                            }
+                            className={
+                              index + 1 === sourceEvidence.line
+                                ? 'source-line-highlight'
+                                : undefined
+                            }
+                          >
+                            {line}
+                            {'\n'}
+                          </span>
+                        ))
+                      : selected.content}
+                  </code>
                 </pre>
                 <p className="inspector-footnote">
                   Source from the active repository snapshot.
                 </p>
+                </details>
               </div>
             ) : mode !== 'UI Flow' && selectedNode ? (
               <div className="inspector-content">

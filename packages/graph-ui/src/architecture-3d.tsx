@@ -1,37 +1,96 @@
 ﻿'use client';
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { QuadraticBezierCurve3, Quaternion, Vector3 } from 'three';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { QuadraticBezierCurve3, Quaternion, Vector3, type Mesh } from 'three';
 import {
   Html,
   Line,
   OrbitControls,
   PerspectiveCamera,
 } from '@react-three/drei';
-import { describeDependency, type DependencyGraph } from '@codedna/shared';
+import { type DependencyGraph } from '@codedna/shared';
+import { DependencyEvidence } from './dependency-evidence.js';
 import {
   buildSceneGraph,
   canRender3D,
   folderOf,
   MAX_3D_EDGES,
   MAX_3D_NODES,
+  MAX_ANIMATED_3D_EDGES,
+  shouldAnimate3D,
   visibleSelectionId,
   type SceneEdge,
 } from './architecture-3d-data.js';
+function MovingArrow({
+  curve,
+  color,
+  onSelect,
+}: {
+  curve: QuadraticBezierCurve3;
+  color: string;
+  onSelect: () => void;
+}) {
+  const ref = useRef<Mesh>(null);
+  const up = useMemo(() => new Vector3(0, 1, 0), []);
+  const tangent = useMemo(() => new Vector3(), []);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const progress = 0.16 + ((clock.elapsedTime * 0.12) % 1) * 0.68;
+    curve.getPoint(progress, ref.current.position);
+    curve.getTangent(progress, tangent).normalize();
+    ref.current.quaternion.setFromUnitVectors(up, tangent);
+  });
+  return (
+    <mesh
+      ref={ref}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}
+    >
+      <coneGeometry args={[0.28, 0.7, 8]} />
+      <meshBasicMaterial color={color} />
+    </mesh>
+  );
+}
 function Architecture3DScene({
   graph,
   selectedId,
   onSelectionChange,
+  onFolderNavigate,
+  edgeEvidence,
+  evidenceGraph,
+  onEvidence,
 }: {
   graph: DependencyGraph;
   selectedId: string | null;
   onSelectionChange: (id: string | null) => void;
+  onFolderNavigate?: (path: string) => void;
+  edgeEvidence?: Record<string, import('@codedna/shared').DependencyEdge[]>;
+  evidenceGraph?: DependencyGraph;
+  onEvidence?: (path: string, line: number) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [edge, setEdge] = useState<SceneEdge | null>(null);
   const [cameraKey, setCameraKey] = useState(0);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [motionEnabled, setMotionEnabled] = useState(true);
+  const [reducedMotion, setReducedMotion] = useState(true);
+  const [pageVisible, setPageVisible] = useState(false);
+  useEffect(() => {
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updateMotion = () => setReducedMotion(preference.matches);
+    const updateVisibility = () => setPageVisible(!document.hidden);
+    updateMotion();
+    updateVisibility();
+    preference.addEventListener('change', updateMotion);
+    document.addEventListener('visibilitychange', updateVisibility);
+    return () => {
+      preference.removeEventListener('change', updateMotion);
+      document.removeEventListener('visibilitychange', updateVisibility);
+    };
+  }, []);
   useEffect(() => {
     const node = graph.nodes.find((item) => item.id === selectedId);
     if (node) setExpanded((current) => new Set([...current, folderOf(node)]));
@@ -43,6 +102,12 @@ function Architecture3DScene({
   const byId = useMemo(
     () => new Map(scene.nodes.map((node) => [node.id, node])),
     [scene.nodes],
+  );
+  const animateArrows = shouldAnimate3D(
+    scene.edges.length,
+    motionEnabled,
+    reducedMotion,
+    pageVisible,
   );
   const visibleSelectedId = useMemo(
     () => visibleSelectionId(scene, graph, selectedId),
@@ -92,13 +157,15 @@ function Architecture3DScene({
         No dependencies or source files to display.
       </div>
     );
-  const toggle = (folder: string) =>
+  const toggle = (folder: string) => {
+    if (!expanded.has(folder)) onFolderNavigate?.(folder);
     setExpanded((current) => {
       const next = new Set(current);
       if (next.has(folder)) next.delete(folder);
       else next.add(folder);
       return next;
     });
+  };
   return (
     <div className="dna-3d-root">
       <div className="dna-3d-toolbar">
@@ -127,10 +194,29 @@ function Architecture3DScene({
         <button type="button" onClick={() => setExpanded(new Set())}>
           Collapse folders
         </button>
+        <button
+          type="button"
+          aria-pressed={motionEnabled}
+          onClick={() => setMotionEnabled((value) => !value)}
+          disabled={reducedMotion || scene.edges.length > MAX_ANIMATED_3D_EDGES}
+          title={
+            reducedMotion
+              ? 'Disabled by your reduced-motion preference'
+              : scene.edges.length > MAX_ANIMATED_3D_EDGES
+                ? 'Disabled for large graphs'
+                : 'Toggle arrow animation'
+          }
+        >
+          {motionEnabled &&
+          !reducedMotion &&
+          scene.edges.length <= MAX_ANIMATED_3D_EDGES
+            ? 'Pause arrows'
+            : 'Animate arrows'}
+        </button>
       </div>
       <Canvas
         key={cameraKey}
-        frameloop="demand"
+        frameloop={animateArrows ? 'always' : 'demand'}
         dpr={[1, 1.5]}
         fallback={
           <div className="dna-3d-fallback">
@@ -197,17 +283,27 @@ function Architecture3DScene({
                     setEdge(item);
                   }}
                 />
-                <mesh
-                  position={midpoint}
-                  quaternion={arrowRotation}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setEdge(item);
-                  }}
-                >
-                  <coneGeometry args={[0.28, 0.7, 8]} />
-                  <meshBasicMaterial color={selected ? '#a1ecff' : '#7999c5'} />
-                </mesh>
+                {animateArrows ? (
+                  <MovingArrow
+                    curve={curve}
+                    color={selected ? '#a1ecff' : '#7999c5'}
+                    onSelect={() => setEdge(item)}
+                  />
+                ) : (
+                  <mesh
+                    position={midpoint}
+                    quaternion={arrowRotation}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setEdge(item);
+                    }}
+                  >
+                    <coneGeometry args={[0.28, 0.7, 8]} />
+                    <meshBasicMaterial
+                      color={selected ? '#a1ecff' : '#7999c5'}
+                    />
+                  </mesh>
+                )}
               </group>
             );
           })}
@@ -323,9 +419,11 @@ function Architecture3DScene({
                       <span className="dna-3d-label-type">
                         {folder
                           ? 'FOLDER'
-                          : node.kind === 'external'
-                            ? 'PACKAGE'
-                            : 'FILE'}
+                          : node.kind === 'module'
+                            ? 'MODULE'
+                            : node.kind === 'external'
+                              ? 'PACKAGE'
+                              : 'FILE'}
                       </span>
                       <strong>
                         {folder ? node.label : node.label.split('/').at(-1)}
@@ -412,22 +510,14 @@ function Architecture3DScene({
             Importer → dependency. Static imports do not prove runtime
             execution.
           </p>
-          <ul>
-            {edge.evidence.map((item) => (
-              <li key={item.id}>
-                {describeDependency(
-                  item,
-                  graph.nodes.find((node) => node.id === item.sourceId)
-                    ?.label ?? item.sourceId,
-                  graph.nodes.find((node) => node.id === item.targetId)
-                    ?.label ?? item.targetId,
-                )}{' '}
-                {item.location
-                  ? ` · ${item.location.path}:${item.location.start.line}:${item.location.start.column}`
-                  : ''}
-              </li>
-            ))}
-          </ul>
+          <DependencyEvidence
+            key={edge.id}
+            edges={edge.evidence.flatMap(
+              (item) => edgeEvidence?.[item.id] ?? [item],
+            )}
+            graph={evidenceGraph ?? graph}
+            {...(onEvidence ? { onSource: onEvidence } : {})}
+          />
         </div>
       )}
       <p className="dna-3d-hint">
@@ -442,6 +532,10 @@ export function Architecture3D(props: {
   graph: DependencyGraph;
   selectedId: string | null;
   onSelectionChange: (id: string | null) => void;
+  onFolderNavigate?: (path: string) => void;
+  edgeEvidence?: Record<string, import('@codedna/shared').DependencyEdge[]>;
+  evidenceGraph?: DependencyGraph;
+  onEvidence?: (path: string, line: number) => void;
 }) {
   if (!canRender3D(props.graph))
     return (

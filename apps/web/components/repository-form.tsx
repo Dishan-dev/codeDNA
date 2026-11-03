@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { SESSION_KEY, type ExplorerSession } from '@/lib/explorer-session';
 import type { AcquisitionResult } from '@codedna/github';
-import type { AnalysisResult } from '@codedna/shared';
+import type { ActionIndex, AnalysisResult, RepositoryUnderstanding, FeatureDiscovery } from '@codedna/shared';
 import type { UIFlowAnalysis } from '@codedna/core';
 import { ArrowRight, GitBranch } from 'lucide-react';
 import { Button, Input } from './ui';
@@ -42,11 +42,16 @@ export function RepositoryForm() {
       const payload = data as AcquisitionResult & {
         analysis: AnalysisResult;
         uiFlow: UIFlowAnalysis;
+        understanding: RepositoryUnderstanding;
+        features: FeatureDiscovery;
+        actions?: ActionIndex;
       };
       if (
         !payload.snapshot ||
         !payload.analysis ||
         !payload.uiFlow ||
+        !payload.understanding ||
+        !payload.features ||
         !payload.repository ||
         !payload.completeness
       )
@@ -55,6 +60,9 @@ export function RepositoryForm() {
         snapshot: payload.snapshot,
         result: payload.analysis,
         uiFlow: payload.uiFlow,
+        understanding: payload.understanding,
+        features: payload.features,
+        ...(payload.actions ? { actions: payload.actions } : {}),
         repositoryName: `${payload.repository.owner}/${payload.repository.repo}`,
         completeness: payload.completeness,
         acquisitionDiagnostics: payload.diagnostics,

@@ -4,22 +4,98 @@ import type {
   DependencyGraph,
   RepositorySnapshot,
   UIFlowGraph,
+  AnalysisDiagnostic,
+  DependencyEdge,
 } from '@codedna/shared';
-import { folderView } from '@/lib/architecture-guide';
+import { folderView, type FolderConnection } from '@/lib/architecture-guide';
+function ConnectionDetails({
+  item,
+  labels,
+  onEvidence,
+}: {
+  item: FolderConnection;
+  labels: Map<string, string>;
+  onEvidence: (path: string, line: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const edges: DependencyEdge[] = showAll
+    ? item.edges
+    : item.edges.slice(0, 20);
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>
+        {item.direction === 'uses' ? 'Uses' : 'Used by'}{' '}
+        <strong>{item.path}</strong>{' '}
+        <small>
+          {item.count} {item.count === 1 ? 'dependency' : 'dependencies'}
+        </small>
+      </summary>
+      {open && (
+        <div className="guide-evidence-list">
+          {edges.map((edge) => (
+            <div key={edge.id}>
+              <span>
+                {labels.get(edge.sourceId) ?? edge.sourceId} →{' '}
+                {labels.get(edge.targetId) ?? edge.targetId}
+              </span>
+              <small>
+                {edge.kind ?? 'dependency'}
+                {edge.specifier ? ` · ${edge.specifier}` : ''}
+              </small>
+              {edge.location && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onEvidence(edge.location!.path, edge.location!.start.line)
+                  }
+                >
+                  View {edge.location.path}:{edge.location.start.line}
+                </button>
+              )}
+            </div>
+          ))}
+          {!showAll && item.edges.length > 20 && (
+            <button type="button" onClick={() => setShowAll(true)}>
+              Show all {item.edges.length} dependencies
+            </button>
+          )}
+        </div>
+      )}
+    </details>
+  );
+}
 export function ArchitectureGuide({
   snapshot,
   graph,
   uiFlow,
   onSelect,
   complete,
+  path,
+  onPathChange,
+  selectedId,
+  diagnostics,
+  onSourceEvidence,
+  onExploreImpact,
+  rootFiles,
+  onVisualize,
+  moduleDescription,
 }: {
   snapshot: RepositorySnapshot;
   graph: DependencyGraph;
   uiFlow: UIFlowGraph;
   onSelect: (id: string) => void;
   complete: boolean;
+  path: string;
+  onPathChange: (path: string) => void;
+  selectedId: string | null;
+  diagnostics: AnalysisDiagnostic[];
+  onSourceEvidence: (path: string, line: number) => void;
+  onExploreImpact: () => void;
+  rootFiles?: boolean;
+  onVisualize: () => void;
+  moduleDescription?: string | undefined;
 }) {
-  const [path, setPath] = useState('');
   const view = useMemo(
     () => folderView(snapshot, graph, path),
     [snapshot, graph, path],
@@ -28,38 +104,66 @@ export function ArchitectureGuide({
     () => new Set(graph.nodes.map((node) => node.id)),
     [graph.nodes],
   );
+  const labels = useMemo(
+    () => new Map(graph.nodes.map((node) => [node.id, node.label])),
+    [graph.nodes],
+  );
   const screens = useMemo(
     () =>
       uiFlow.nodes
         .filter(
           (node) =>
-            node.sourceFile && graphNodeIds.has(`file:${node.sourceFile}`),
+            node.sourceFile &&
+            graphNodeIds.has(`file:${node.sourceFile}`) &&
+            (rootFiles
+              ? !node.sourceFile.includes('/')
+              : !path || node.sourceFile.startsWith(`${path}/`)),
         )
         .slice(0, 4),
-    [uiFlow, graphNodeIds],
+    [uiFlow, graphNodeIds, path, rootFiles],
   );
-  const source = graph.edges.find((edge) => edge.sourceId.startsWith('file:'));
+  const source = graph.edges.find(
+    (edge) =>
+      edge.location &&
+      (rootFiles
+        ? !edge.location.path.includes('/')
+        : !path || edge.location.path.startsWith(`${path}/`)),
+  );
   const [showAll, setShowAll] = useState(false);
-  const pathParts = path ? path.split('/') : [];
+  const [filter, setFilter] = useState('');
+  const folders = (rootFiles ? [] : view.folders).filter((item) =>
+    item.name.toLowerCase().includes(filter.toLowerCase()),
+  );
+  const files = view.files.filter((item) =>
+    item.path.toLowerCase().includes(filter.toLowerCase()),
+  );
   return (
     <section className="architecture-guide" aria-label="Codebase guide">
       <div className="guide-hero">
         <div>
-          <span className="guide-eyebrow">START HERE / CODEBASE GUIDE</span>
-          <h2>Understand the code, one folder at a time.</h2>
-          <p>
-            Explore where files live, then follow the imports that connect them.
-          </p>
+          <span className="guide-eyebrow">02 / MODULE</span>
+          <h2>{rootFiles ? 'Root files' : path || 'Repository files'}</h2>
+          <p>{moduleDescription || 'A source folder in this repository. Open a file to inspect its detected relationships.'}</p>
         </div>
         <div className="guide-stats">
           <span>
-            <strong>{snapshot.files.length}</strong> files in snapshot
+            <strong>
+              {rootFiles
+                ? view.files.length
+                : snapshot.files.filter(
+                    (file) => !path || file.path.startsWith(`${path}/`),
+                  ).length}
+            </strong>{' '}
+            files in this folder
           </span>
           <span>
-            <strong>{graph.edges.length}</strong> detected dependencies
+            <strong>
+              {view.connections.reduce((sum, item) => sum + item.count, 0)}
+            </strong>{' '}
+            connections outside this folder
           </span>
           <span>
-            <strong>{uiFlow.nodes.length}</strong> detected screens
+            <strong>{screens.length}</strong> suggested screens
           </span>
         </div>
       </div>
@@ -68,6 +172,26 @@ export function ArchitectureGuide({
           This repository snapshot is partial. Some files and connections may be
           missing.
         </p>
+      )}
+      {selectedId?.startsWith('file:') && (
+        <div className="guide-card">
+          <span className="guide-eyebrow">SELECTED FILE</span>
+          <h3>{selectedId.slice(5)}</h3>
+          <p>
+            The inspector shows its source and directly detected dependencies.
+            Open a small map only if you need a visual view.
+          </p>
+          <button className="guide-action" type="button" onClick={onVisualize}>
+            Visualize relationships →
+          </button>{' '}
+          <button
+            className="guide-more"
+            type="button"
+            onClick={onExploreImpact}
+          >
+            View potential impact →
+          </button>
+        </div>
       )}
       <div className="guide-grid">
         <div className="guide-main">
@@ -81,35 +205,22 @@ export function ArchitectureGuide({
                 {view.folders.length} folders · {view.files.length} files here
               </span>
             </div>
-            <nav className="guide-breadcrumbs" aria-label="Folder path">
-              <button type="button" onClick={() => setPath('')}>
-                Repository
-              </button>
-              {pathParts.map((part, index) => (
-                <span key={pathParts.slice(0, index + 1).join('/')}>
-                  <span aria-hidden="true"> / </span>
-                  <button
-                    type="button"
-                    aria-current={
-                      index === pathParts.length - 1 ? 'location' : undefined
-                    }
-                    onClick={() =>
-                      setPath(pathParts.slice(0, index + 1).join('/'))
-                    }
-                  >
-                    {part}
-                  </button>
-                </span>
-              ))}
-            </nav>
+            <label className="guide-file-search">
+              Search files and folders{' '}
+              <input
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder="Filter this folder"
+              />
+            </label>
             <div className="guide-entries">
-              {view.folders.map((folder) => (
+              {(showAll ? folders : folders.slice(0, 8)).map((folder) => (
                 <button
                   type="button"
                   className="guide-entry"
                   key={folder.path}
                   onClick={() => {
-                    setPath(folder.path);
+                    onPathChange(folder.path);
                     setShowAll(false);
                   }}
                 >
@@ -124,7 +235,7 @@ export function ArchitectureGuide({
                   <span aria-hidden="true">→</span>
                 </button>
               ))}
-              {(showAll ? view.files : view.files.slice(0, 30)).map((file) => (
+              {(showAll ? files : files.slice(0, 8)).map((file) => (
                 <button
                   type="button"
                   className="guide-entry"
@@ -139,39 +250,39 @@ export function ArchitectureGuide({
                   <span aria-hidden="true">→</span>
                 </button>
               ))}
-              {!view.folders.length && !view.files.length && (
+              {!folders.length && !files.length && (
                 <p>No supported source files in this folder.</p>
               )}
-              {view.files.length > 30 && !showAll && (
+              {(files.length > 8 || folders.length > 8) && !showAll && (
                 <button
                   className="guide-more"
                   type="button"
                   onClick={() => setShowAll(true)}
                 >
-                  Show all {view.files.length} files
+                  Show all folders and files ({folders.length + files.length})
                 </button>
               )}
             </div>
           </div>
           {path && (
-            <div className="guide-card">
+            <details className="guide-card guided-secondary">
+              <summary>Direct relationships with other modules ({view.connections.length})</summary>
               <span className="guide-eyebrow">HOW THIS FOLDER CONNECTS</span>
               <h3>Direct dependencies</h3>
               <p>
-                These are detected import statements crossing the folder
-                boundary. Select a file to see the exact source lines.
+                Expand a relationship to see the actual files and import
+                locations. Arrows point from the importing file to its
+                dependency.
               </p>
               {view.connections.length ? (
                 <ul className="guide-connections">
                   {view.connections.map((item) => (
                     <li key={`${item.direction}:${item.path}`}>
-                      <span>
-                        {item.direction === 'uses' ? 'Uses' : 'Used by'}{' '}
-                        <strong>{item.path}</strong>
-                      </span>
-                      <small>
-                        {item.count} {item.count === 1 ? 'import' : 'imports'}
-                      </small>
+                      <ConnectionDetails
+                        item={item}
+                        labels={labels}
+                        onEvidence={onSourceEvidence}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -181,67 +292,12 @@ export function ArchitectureGuide({
                   every dependency.
                 </p>
               )}
-            </div>
+            </details>
           )}
         </div>
         <aside className="guide-aside">
-          <div className="guide-card">
-            <span className="guide-eyebrow">A SIMPLE WAY TO START</span>
-            <h3>Explore in three steps</h3>
-            <ol className="guide-steps">
-              <li>
-                <strong>Find a screen</strong>
-                <p>Start from a route detected in this snapshot.</p>
-                {screens.length ? (
-                  screens.map((node) => (
-                    <button
-                      type="button"
-                      key={node.id}
-                      onClick={() => onSelect(`file:${node.sourceFile}`)}
-                    >
-                      {node.routePath ?? node.label} →
-                    </button>
-                  ))
-                ) : (
-                  <small>
-                    No supported screens detected. Pick a file from the
-                    repository instead.
-                  </small>
-                )}
-              </li>
-              <li>
-                <strong>Follow an import</strong>
-                <p>Choose a file to see what it uses and which files use it.</p>
-                {source && (
-                  <button
-                    type="button"
-                    onClick={() => onSelect(source.sourceId)}
-                  >
-                    Inspect a file with an import →
-                  </button>
-                )}
-              </li>
-              <li>
-                <strong>Explore the map</strong>
-                <p>
-                  Switch to 2D or 3D to see the same detected connections
-                  visually.
-                </p>
-              </li>
-            </ol>
-          </div>
-          <div className="guide-card guide-legend">
-            <span className="guide-eyebrow">READING THE MAP</span>
-            <h3>What does an arrow mean?</h3>
-            <p>
-              <strong>File A → File B</strong> means A imports or re-exports B.
-              It does not necessarily mean A calls B at runtime.
-            </p>
-            <p>
-              External packages can be shown separately in the map. Unresolved
-              imports are listed in analysis diagnostics.
-            </p>
-          </div>
+          <div className="guide-card"><span className="guide-eyebrow">NEXT STEP</span><h3>Follow an entry point</h3>{screens.length ? screens.map((node) => <button type="button" className="guide-entry" key={node.id} onClick={() => onSelect(`file:${node.sourceFile}`)}>{node.routePath ?? node.label} →</button>) : source ? <button type="button" className="guide-entry" onClick={() => onSelect(source.sourceId)}>Inspect a file with an import →</button> : <p>Select a file in this folder to inspect its source.</p>}<button type="button" className="guide-more" onClick={onVisualize}>Show a focused 2D map →</button></div>
+          <details className="guide-card guided-secondary"><summary>Analysis status and map legend</summary><p>File A → File B means A imports or re-exports B. Runtime calls are not established by imports alone.</p><p>{diagnostics.length} analysis diagnostics. Static analysis may miss dynamic dependencies.</p><ul className="guide-diagnostics">{diagnostics.slice(0, 20).map((item) => <li key={item.id}>{item.message}{item.location && <button type="button" onClick={() => onSourceEvidence(item.location!.path, item.location!.start.line)}>{item.location.path}:{item.location.start.line}</button>}</li>)}</ul></details>
         </aside>
       </div>
     </section>

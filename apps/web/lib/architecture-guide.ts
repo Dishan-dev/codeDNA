@@ -1,5 +1,6 @@
 ﻿import type {
   DependencyGraph,
+  DependencyEdge,
   RepositorySnapshot,
   SourceFile,
 } from '@codedna/shared';
@@ -12,8 +13,82 @@ export interface FolderConnection {
   path: string;
   count: number;
   direction: 'uses' | 'used-by';
+  edges: DependencyEdge[];
 }
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+export type DependencyQuestion = 'all' | 'direct' | 'uses' | 'dependents';
+/** Filter only existing edges; the selected file remains visible even with no connections. */
+export function graphForQuestion(
+  graph: DependencyGraph,
+  selectedId: string | null,
+  question: DependencyQuestion,
+): DependencyGraph {
+  if (!selectedId || question === 'all') return graph;
+  const edges = graph.edges.filter((edge) =>
+    question === 'uses'
+      ? edge.sourceId === selectedId
+      : question === 'dependents'
+        ? edge.targetId === selectedId
+        : edge.sourceId === selectedId || edge.targetId === selectedId,
+  );
+  const ids = new Set([selectedId]);
+  for (const edge of edges) {
+    ids.add(edge.sourceId);
+    ids.add(edge.targetId);
+  }
+  return {
+    ...graph,
+    nodes: graph.nodes.filter((node) => ids.has(node.id)),
+    edges,
+  };
+}
+/** Show a folder and its direct neighbours, preserving only real source edges. */
+export function graphForFolder(
+  graph: DependencyGraph,
+  path: string,
+): DependencyGraph {
+  if (!path) return graph;
+  const members = new Set(
+    graph.nodes
+      .filter(
+        (node) => node.kind !== 'external' && node.label.startsWith(`${path}/`),
+      )
+      .map((node) => node.id),
+  );
+  const visible = new Set(members);
+  const edges = graph.edges.filter(
+    (edge) => members.has(edge.sourceId) || members.has(edge.targetId),
+  );
+  for (const edge of edges) {
+    visible.add(edge.sourceId);
+    visible.add(edge.targetId);
+  }
+  return {
+    ...graph,
+    nodes: graph.nodes.filter((node) => visible.has(node.id)),
+    edges,
+  };
+}
+export function graphForRootFiles(graph: DependencyGraph): DependencyGraph {
+  const ids = new Set(
+    graph.nodes
+      .filter((node) => node.kind !== 'external' && !node.label.includes('/'))
+      .map((node) => node.id),
+  );
+  const visible = new Set(ids);
+  const edges = graph.edges.filter(
+    (edge) => ids.has(edge.sourceId) || ids.has(edge.targetId),
+  );
+  for (const edge of edges) {
+    visible.add(edge.sourceId);
+    visible.add(edge.targetId);
+  }
+  return {
+    ...graph,
+    nodes: graph.nodes.filter((node) => visible.has(node.id)),
+    edges,
+  };
+}
 export function folderView(
   snapshot: RepositorySnapshot,
   graph: DependencyGraph,
@@ -56,15 +131,26 @@ export function folderView(
             : 'Root files';
       const direction = sourceIn ? 'uses' : 'used-by',
         key = `${direction}:${otherPath}`;
-      const value = links.get(key) ?? { path: otherPath, count: 0, direction };
+      const value = links.get(key) ?? {
+        path: otherPath,
+        count: 0,
+        direction,
+        edges: [],
+      };
       value.count++;
+      value.edges.push(edge);
       links.set(key, value);
     }
   return {
     folders: [...folders.values()].sort((a, b) => compare(a.name, b.name)),
     files: files.sort((a, b) => compare(a.path, b.path)),
-    connections: [...links.values()].sort((a, b) =>
-      compare(`${a.direction}:${a.path}`, `${b.direction}:${b.path}`),
-    ),
+    connections: [...links.values()]
+      .map((value) => ({
+        ...value,
+        edges: value.edges.sort((a, b) => compare(a.id, b.id)),
+      }))
+      .sort((a, b) =>
+        compare(`${a.direction}:${a.path}`, `${b.direction}:${b.path}`),
+      ),
   };
 }

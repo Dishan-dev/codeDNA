@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { RepositorySnapshot, SourceFile } from '@codedna/shared';
+import type { RepositorySnapshot, RepositoryText, SourceFile } from '@codedna/shared';
 import { readArchive } from './archive.js';
 
 export interface RepositoryIdentity {
@@ -39,7 +39,7 @@ export interface AcquisitionOptions {
   signal?: AbortSignal;
   fetch?: typeof fetch;
   limits?: Partial<AcquisitionLimits>;
-  strategy?: 'blobs' | 'archive';
+  strategy?: 'blobs' | 'archive' | 'auto';
 }
 export interface AcquisitionLimits {
   maxFiles: number;
@@ -54,7 +54,7 @@ const defaults: AcquisitionLimits = {
   maxFileBytes: 2 * 1024 * 1024,
   maxTotalBytes: 50 * 1024 * 1024,
   maxRequests: 1003,
-  timeoutMs: 30000,
+  timeoutMs: 60000,
   concurrency: 4,
 };
 const maximums: AcquisitionLimits = {
@@ -127,6 +127,11 @@ const safePath = (path: string) =>
 const included = (path: string) =>
   /\.(?:ts|tsx|js|jsx)$/.test(path) ||
   /(?:^|\/)(?:tsconfig|jsconfig)\.json$/.test(path);
+const documentation = (path: string) =>
+  /(?:^|\/)readme(?:\.[\w.-]+)?\.md$/i.test(path) ||
+  /(?:^|\/)docs\/(?:[^/]+\/)*[^/]+\.md$/i.test(path) ||
+  /^(?:apps|packages)\/[^/]+\/[^/]+\.md$/i.test(path);
+const manifest = (path: string) => /(?:^|\/)package\.json$/.test(path);
 const excluded = (path: string) =>
   path.split('/').some((part) => ignored.has(part)) ||
   /(?:\.min|\.bundle)\.(?:js|jsx|ts|tsx)$/.test(path);
@@ -274,9 +279,12 @@ export async function acquireRepository(
     if (sha(tree.sha) !== treeSha || !Array.isArray(tree.tree))
       fail('invalid_response', 'GitHub returned an invalid file tree.');
     const skipped: { code: string; path: string; message: string }[] = [];
-    const entries: { path: string; sha: string; size: number }[] = [];
+    const entries: { path: string; sha: string; size: number; kind: 'source' | 'document' | 'manifest' }[] = [];
     const seen = new Set<string>();
     let total = 0;
+    let archiveBytes = 0;
+    let archiveSizeKnown = true;
+    let documentCount = 0, manifestCount = 0, documentBytes = 0, manifestBytes = 0;
     for (const item of tree.tree as unknown[]) {
       const entry = record(item);
       if (!['tree', 'blob', 'commit'].includes(String(entry.type)))
@@ -288,6 +296,11 @@ export async function acquireRepository(
       if (seen.has(path))
         fail('invalid_response', 'GitHub returned duplicate file paths.');
       seen.add(path);
+      if (entry.type === 'blob') {
+        if (Number.isSafeInteger(entry.size) && (entry.size as number) >= 0)
+          archiveBytes += entry.size as number;
+        else archiveSizeKnown = false;
+      }
       if (excluded(path)) continue;
       if (entry.type === 'commit' || entry.mode === '120000') {
         skipped.push({
@@ -298,7 +311,8 @@ export async function acquireRepository(
         });
         continue;
       }
-      if (!included(path) || entry.type === 'tree') continue;
+      const kind = included(path) ? 'source' : documentation(path) ? 'document' : manifest(path) ? 'manifest' : null;
+      if (!kind || entry.type === 'tree') continue;
       if (
         entry.type !== 'blob' ||
         (entry.mode !== '100644' && entry.mode !== '100755')
@@ -310,6 +324,17 @@ export async function acquireRepository(
       if (!Number.isSafeInteger(entry.size) || (entry.size as number) < 0)
         fail('invalid_response', 'GitHub returned an invalid file size.');
       const size = entry.size as number;
+      if (kind === 'document') {
+        documentCount++;
+        documentBytes += size;
+        if (documentCount > 100 || documentBytes > 2 * 1024 * 1024)
+          fail('limit_exceeded', 'Repository documentation exceeds acquisition limits.');
+      } else if (kind === 'manifest') {
+        manifestCount++;
+        manifestBytes += size;
+        if (manifestCount > 50 || manifestBytes > 1024 * 1024)
+          fail('limit_exceeded', 'Repository manifests exceed acquisition limits.');
+      }
       total += size;
       if (
         size > limits.maxFileBytes ||
@@ -317,7 +342,7 @@ export async function acquireRepository(
         entries.length + 1 > limits.maxFiles
       )
         fail('limit_exceeded', 'Repository source exceeds acquisition limits.');
-      entries.push({ path, sha: sha(entry.sha), size });
+      entries.push({ path, sha: sha(entry.sha), size, kind });
     }
     entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     const blobSizes = new Map<string, number>();
@@ -327,13 +352,21 @@ export async function acquireRepository(
         fail('invalid_response', 'GitHub returned inconsistent blob sizes.');
       blobSizes.set(entry.sha, entry.size);
     }
+    // A tarball includes unsupported assets. Prefer selective blobs when its
+    // known contents are large, so unrelated binaries do not consume the whole
+    // acquisition deadline. The caller can still force either strategy.
+    const strategy = options.strategy === 'auto'
+      ? archiveSizeKnown && archiveBytes <= 100 * 1024 * 1024
+        ? 'archive'
+        : 'blobs'
+      : options.strategy ?? 'blobs';
     if (
-      (options.strategy === 'archive' ? 1 : blobSizes.size) + requests >
+      (strategy === 'archive' ? 1 : blobSizes.size) + requests >
       limits.maxRequests
     )
       fail('limit_exceeded', 'Repository exceeds the GitHub request limit.');
     let archive: Map<string, Uint8Array> | undefined;
-    if (options.strategy === 'archive') {
+    if (strategy === 'archive') {
       if (controller.signal.aborted)
         fail(
           timedOut ? 'timeout' : 'cancelled',
@@ -368,7 +401,7 @@ export async function acquireRepository(
     }
     const blobs = new Map<string, Promise<Record<string, unknown>>>();
     const results: (
-      | { file: SourceFile }
+      | { file: SourceFile | RepositoryText; kind: 'source' | 'document' | 'manifest' }
       | { binary: string }
       | { lfs: string }
     )[] = new Array(entries.length);
@@ -435,7 +468,8 @@ export async function acquireRepository(
           continue;
         }
         results[index] = {
-          file: { id: entry.path, path: entry.path, content },
+          kind: entry.kind,
+          file: entry.kind === 'source' ? { id: entry.path, path: entry.path, content } : { path: entry.path, content },
         };
       }
     }
@@ -451,7 +485,13 @@ export async function acquireRepository(
       throw error;
     }
     const files = results.flatMap((item) =>
-      'file' in item ? [item.file] : [],
+      'file' in item && item.kind === 'source' ? [item.file as SourceFile] : [],
+    );
+    const documents = results.flatMap((item) =>
+      'file' in item && item.kind === 'document' ? [item.file as RepositoryText] : [],
+    );
+    const manifests = results.flatMap((item) =>
+      'file' in item && item.kind === 'manifest' ? [item.file as RepositoryText] : [],
     );
     const diagnostics = [
       ...skipped,
@@ -483,6 +523,8 @@ export async function acquireRepository(
         id: `${repository.owner}/${repository.repo}@${commitSha}`,
         revision: commitSha,
         files,
+        documents,
+        manifests,
       },
       diagnostics,
       completeness: {

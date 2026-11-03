@@ -1,0 +1,212 @@
+/* Page → action → trace screens. Layout follows docs/design/codedna-ui-prototype.html; values come from tokens.css. */
+
+/* Header */
+:root .explorer .explorer-header.flow-header {
+  height: auto;
+  min-height: 65px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px 24px;
+  padding: 10px 24px;
+  background: var(--dna-card);
+  border-bottom: 1px solid var(--dna-line);
+  color: var(--dna-ink);
+  font-family: var(--dna-sans);
+  position: relative;
+  z-index: 5;
+}
+.flow-header__identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.flow-header .brand { color: var(--dna-ink); }
+.flow-header .back-link { color: var(--dna-muted); }
+.flow-header__repo { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.flow-header__repo strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
+.flow-pill { font: 13px var(--dna-mono); padding: 2px 8px; border-radius: 6px; background: var(--dna-chip); color: var(--dna-ink-2); white-space: nowrap; }
+.flow-tabs { display: flex; gap: 20px; }
+.flow-tabs button { min-height: var(--dna-touch); padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--dna-ink-2); font: inherit; font-size: 15px; cursor: pointer; }
+.flow-tabs button[aria-current='page'] { color: var(--dna-ink); font-weight: 600; border-bottom-color: var(--dna-ink); }
+.flow-search { flex: 1 1 260px; position: relative; display: flex; min-width: 0; }
+.flow-search input { flex: 1; min-width: 0; min-height: var(--dna-touch); padding: 0 14px; border: 1px solid var(--dna-field); border-radius: 8px; background: var(--dna-field-bg); color: var(--dna-ink); font: inherit; font-size: 15px; }
+.flow-search input::placeholder { color: var(--dna-muted); }
+.flow-search__results { position: absolute; top: 50px; left: 0; right: 0; z-index: 30; margin: 0; padding: 0; list-style: none; background: var(--dna-card); border: 1px solid var(--dna-line); border-radius: 10px; box-shadow: var(--dna-shadow); overflow: hidden; }
+.flow-search__results button { display: flex; justify-content: space-between; gap: 12px; width: 100%; min-height: var(--dna-touch); padding: 10px 14px; border: 0; border-bottom: 1px solid var(--dna-line-2); background: none; color: var(--dna-ink); font: inherit; text-align: left; cursor: pointer; }
+.flow-search__results button:hover, .flow-search__results button:focus { background: var(--dna-hover); }
+.flow-search__none { padding: 10px 14px; }
+.flow-header__tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.flow-header__tools > button[aria-label] { color: var(--dna-ink-2); }
+.flow-hbtn { min-height: var(--dna-touch); padding: 0 14px; border: 1px solid var(--dna-field); border-radius: 8px; background: var(--dna-card); color: var(--dna-ink-2); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.flow-hbtn:disabled { cursor: not-allowed; opacity: 0.6; }
+.flow-menu { position: relative; }
+.flow-menu__list { position: absolute; right: 0; top: 50px; z-index: 30; width: 280px; margin: 0; padding: 6px; list-style: none; background: var(--dna-card); border: 1px solid var(--dna-line); border-radius: 10px; box-shadow: var(--dna-shadow); }
+.flow-menu__list button { display: block; width: 100%; min-height: var(--dna-touch); padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--dna-ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.flow-menu__list button small { display: block; color: var(--dna-muted); font-size: 12px; }
+.flow-menu__list button:hover, .flow-menu__list button:focus { background: var(--dna-hover); }
+
+/* Workspace */
+:root .explorer .workspace.flow-workspace { background: var(--dna-bg); background-image: none; color: var(--dna-ink); font-family: var(--dna-sans); font-size: 15px; line-height: 1.5; }
+.flow-workspace:before { display: none; }
+.flow-workspace :is(button, input, select, summary, [tabindex]):focus-visible, .flow-header :is(button, input):focus-visible { outline: 2px solid var(--dna-focus); outline-offset: 2px; }
+.flow-page { width: 100%; max-width: 1240px; margin: 0 auto; padding: 32px 32px 72px; display: flex; flex-direction: column; gap: 24px; }
+.flow-page h1 { margin: 0; font-size: 32px; line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.flow-page h2 { margin: 0; font-size: 17px; }
+.flow-card { background: var(--dna-card); border: 1px solid var(--dna-line); border-radius: var(--dna-radius); }
+.flow-pad { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.flow-note { font-size: 13px; color: var(--dna-muted); }
+.flow-mono { font-family: var(--dna-mono); }
+.flow-small { font-size: 13px; }
+.flow-intro { display: flex; flex-direction: column; gap: 8px; }
+.flow-lead { margin: 0; max-width: 760px; color: var(--dna-ink-2); font-size: 17px; }
+.flow-intro .flow-note { margin: 0; }
+.flow-title { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.flow-title p { margin: 0; color: var(--dna-ink-2); }
+.flow-h1-route { font-weight: 500; font-size: 30px !important; }
+.flow-h1-symbol { font-weight: 500; }
+.flow-row-between { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; }
+.flow-row-end { align-items: flex-end; }
+.flow-button, .flow-go { min-height: var(--dna-touch); padding: 0 16px; border-radius: 8px; border: 0; background: var(--dna-ink); color: var(--dna-on-ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.flow-link { padding: 0; border: 0; background: none; color: var(--tier-fw); font: inherit; text-decoration: underline; cursor: pointer; }
+.flow-notice { margin: 16px auto 0; width: calc(100% - 64px); max-width: 1176px; padding: 12px 16px; border: 1px solid var(--tier-guess); border-radius: 10px; background: var(--tier-guess-bg); color: var(--dna-ink); font-size: 14px; }
+.flow-page .flow-notice { margin: 0; width: auto; }
+.flow-empty { padding: 24px 26px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.flow-empty p { margin: 0; color: var(--dna-ink-2); max-width: 70ch; }
+.flow-limits { color: var(--dna-muted); font-size: 14px; }
+.flow-limits summary { cursor: pointer; min-height: 32px; }
+.flow-limits li { margin: 6px 0; }
+
+.flow-inline-code { padding: 0 4px; border-radius: 4px; background: var(--dna-chip); font: 0.92em var(--dna-mono); overflow-wrap: anywhere; }
+.flow-code .flow-inline-code { background: var(--code-line); color: var(--code-ink); }
+
+/* Tier badge: text always names the tier; gap is also dashed. */
+.tier-badge { display: inline-block; padding: 2px 10px; border: 1px solid transparent; border-radius: 999px; font: 600 12px var(--dna-sans); text-align: center; white-space: nowrap; }
+.tier-badge--resolved { background: var(--tier-proven-bg); color: var(--tier-proven); }
+.tier-badge--conventional { background: var(--tier-fw-bg); color: var(--tier-fw); }
+.tier-badge--heuristic { background: var(--tier-guess-bg); color: var(--tier-guess); }
+.tier-badge--inferred { background: var(--tier-ai-bg); color: var(--tier-ai); }
+.tier-badge--gap { background: var(--tier-gap-badge-bg); color: var(--tier-gap); border: 1px dashed var(--tier-gap-line); }
+
+/* Overview */
+.flow-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.flow-stat { padding: 18px 20px; }
+.flow-stat b { display: block; font-size: 30px; }
+.flow-stat span { color: var(--dna-ink-2); }
+.flow-stat--gap { border-style: dashed; border-color: var(--tier-gap-line); }
+.flow-stat--gap b { color: var(--tier-gap); }
+.flow-coverage { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.flow-coverage h2 { font-size: 16px; }
+.flow-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--dna-line-2); }
+.flow-bar__followed { background: var(--bar-proven); }
+.flow-bar__guess { background: var(--bar-guess); }
+.flow-bar__gap { background: repeating-linear-gradient(45deg, var(--bar-gap-a) 0 6px, var(--bar-gap-b) 6px 12px); }
+.flow-coverage__legend { margin: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 14px; color: var(--dna-ink-2); }
+.flow-two { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.flow-wide { flex: 999 1 560px; min-width: 0; overflow: hidden; }
+.flow-side { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.flow-side h2 { font-size: 16px; }
+.flow-card__head { padding: 18px 24px; border-bottom: 1px solid var(--dna-line); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; }
+.flow-rows { margin: 0; padding: 0; list-style: none; }
+.flow-page-row { display: grid; grid-template-columns: minmax(170px, 2fr) minmax(0, 3fr) 100px 130px; gap: 16px; align-items: center; width: 100%; min-height: var(--dna-touch); padding: 14px 24px; border: 0; border-bottom: 1px solid var(--dna-line-2); background: none; color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.flow-page-row:hover { background: var(--dna-hover); }
+.flow-page-row__route { font-weight: 500; overflow-wrap: anywhere; }
+.flow-page-row__desc { color: var(--dna-ink-2); overflow-wrap: anywhere; }
+.flow-status { font-size: 13px; color: var(--dna-muted); }
+.flow-status--resolved { color: var(--tier-proven); }
+.flow-status--heuristic { color: var(--tier-guess); }
+.flow-status--gap { color: var(--tier-gap); }
+.flow-gaps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.flow-gap { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px 12px; border: 1px dashed var(--tier-gap-line); border-radius: 8px; background: var(--tier-gap-bg); color: var(--dna-ink); font: inherit; text-align: left; cursor: pointer; }
+.flow-gap b { font-size: 14px; }
+.flow-gap span { font-size: 13px; color: var(--dna-ink-2); }
+.flow-gap code { font: 12px var(--dna-mono); color: var(--dna-muted); overflow-wrap: anywhere; }
+.flow-legend { margin: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--dna-ink-2); }
+.flow-legend div { display: flex; gap: 10px; align-items: center; }
+.flow-legend dt { flex: 0 0 104px; }
+.flow-legend dt .tier-badge { width: 100%; }
+.flow-legend dd { margin: 0; }
+
+/* Page inventory */
+.flow-crumb { font-size: 14px; color: var(--dna-muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow-crumb button { min-height: 32px; padding: 0; border: 0; background: none; color: var(--tier-fw); font: inherit; text-decoration: underline; cursor: pointer; }
+.flow-crumb [aria-current='page'] { color: var(--dna-ink); }
+.flow-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.flow-filters button { min-height: var(--dna-touch); padding: 0 14px; border: 1px solid var(--dna-field); border-radius: 999px; background: var(--dna-card); color: var(--dna-ink); font: inherit; font-size: 14px; cursor: pointer; }
+.flow-filters button[aria-pressed='true'] { background: var(--dna-ink); color: var(--dna-on-ink); border-color: var(--dna-ink); }
+.flow-groups { display: flex; flex-direction: column; gap: 18px; }
+.flow-group-head { padding: 14px 24px; background: var(--dna-hover); border-bottom: 1px solid var(--dna-line); border-radius: var(--dna-radius) var(--dna-radius) 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.flow-group-head h2 { font-size: 15px; font-weight: 500; }
+.flow-actions { margin: 0; padding: 0; list-style: none; }
+.flow-action { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--dna-line-2); }
+.flow-action:last-child { border-bottom: 0; }
+.flow-action.is-gap { background: var(--tier-gap-bg); }
+.flow-action__name { flex: 2 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.flow-action__name b { font-size: 16px; }
+.flow-action__name code { font: 12px var(--dna-mono); color: var(--dna-muted); overflow-wrap: anywhere; }
+.flow-action__reason { flex: 4 1 420px; margin: 0; font-size: 14px; color: var(--dna-ink-2); }
+.flow-action > .tier-badge { flex: 0 0 110px; }
+.flow-chips { flex: 3 1 300px; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.flow-chip { padding: 3px 9px; border-radius: 6px; background: var(--dna-chip); color: var(--dna-ink-2); font: 12px var(--dna-mono); }
+.flow-more { display: flex; justify-content: center; }
+.flow-gap-text { color: var(--tier-gap); }
+
+/* Trace */
+.flow-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; color: var(--dna-ink-2); }
+.flow-meta .flow-note { margin-left: 6px; }
+.flow-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.flow-ctrl { min-height: var(--dna-touch); padding: 0 14px; border: 1px solid var(--dna-field); border-radius: 8px; background: var(--dna-card); color: var(--dna-ink); font: inherit; font-size: 14px; cursor: pointer; }
+.flow-ctrl--primary { background: var(--dna-ink); color: var(--dna-on-ink); border-color: var(--dna-ink); }
+.flow-ctrl:disabled { opacity: 0.45; cursor: not-allowed; }
+.flow-counter { min-width: 86px; text-align: center; }
+.flow-copied { margin: 0; font-size: 13px; color: var(--dna-muted); }
+.flow-copied label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.flow-copied input { flex: 1 1 320px; min-height: 36px; padding: 0 10px; border: 1px solid var(--dna-field); border-radius: 6px; background: var(--dna-field-bg); color: var(--dna-ink); font: 12px var(--dna-mono); }
+.flow-trace { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.flow-steps-wrap { flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.flow-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.flow-step { display: flex; gap: 14px; }
+.flow-step__rail { display: flex; flex-direction: column; align-items: center; flex: 0 0 28px; }
+.flow-step__dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; background: var(--dna-card); border: 2px solid var(--dna-field); color: var(--dna-muted); }
+.flow-step__line { flex: 1; width: 2px; min-height: 14px; background: var(--dna-line); }
+.flow-step__line.is-dashed { background: none; border-left: 2px dashed var(--tier-gap-line); }
+.flow-step__body { flex: 1; min-width: 0; margin: 0 0 12px calc(var(--depth, 0) * 12px); }
+.flow-step__select { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 14px 16px; border: 1px solid var(--dna-line); border-radius: 10px; background: var(--dna-card); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.flow-step.is-current .flow-step__select { border-color: var(--dna-ink); box-shadow: 0 0 0 1px var(--dna-ink); }
+.flow-step.is-current .flow-step__dot { background: var(--dna-ink); border-color: var(--dna-ink); color: var(--dna-on-ink); }
+.flow-step.is-gap .flow-step__select { border-style: dashed; border-color: var(--tier-gap-line); background: var(--tier-gap-bg); }
+.flow-step.is-gap .flow-step__dot { border-style: dashed; border-color: var(--tier-gap-line); color: var(--tier-gap); }
+.flow-step__title { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.flow-step__title b { font-size: 15px; }
+.flow-step__code { font: 12.5px var(--dna-mono); color: var(--dna-ink-2); overflow-wrap: anywhere; }
+.flow-step__plain { font-size: 14px; color: var(--dna-ink-2); }
+.flow-step__when { font-size: 12px; color: var(--dna-muted); font-style: italic; }
+.flow-branch { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.flow-branch__cond { padding: 2px 6px; border-radius: 4px; background: var(--dna-chip); font: 12px var(--dna-mono); color: var(--dna-ink); }
+.flow-branch button { min-height: var(--dna-touch); padding: 0 12px; border: 1px solid var(--dna-field); border-radius: 999px; background: var(--dna-card); color: var(--dna-ink); font: inherit; font-size: 13px; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.flow-branch button[aria-pressed='true'] { background: var(--dna-ink); color: var(--dna-on-ink); border-color: var(--dna-ink); }
+.flow-code { flex: 1 1 520px; min-width: 0; position: sticky; top: 16px; background: var(--code-bg); color: var(--code-ink); border-radius: var(--dna-radius); overflow: hidden; }
+.flow-code__head, .flow-code__foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 16px; font-size: 13px; color: var(--code-muted); }
+.flow-code__head { border-bottom: 1px solid var(--code-line); font-family: var(--dna-mono); overflow-wrap: anywhere; }
+.flow-code__foot { border-top: 1px solid var(--code-line); flex-direction: column; }
+.flow-code__body { margin: 0; padding: 12px 0; overflow-x: auto; font: 13px/1.75 var(--dna-mono); }
+.flow-code__line { display: flex; white-space: pre; padding: 0 16px; }
+.flow-code__line i { flex: 0 0 40px; font-style: normal; color: var(--code-gutter); user-select: none; }
+.flow-code__line.is-current { background: var(--code-hl); box-shadow: inset 3px 0 0 var(--code-hl-edge); }
+.flow-code__empty { margin: 0; padding: 16px; color: var(--code-muted); }
+.flow-code__reach { align-self: flex-start; min-height: var(--dna-touch); padding: 0; border: 0; background: none; color: var(--code-link); font: inherit; text-decoration: underline; cursor: pointer; }
+.flow-code__reach:focus-visible { outline: 2px solid var(--code-link); outline-offset: 2px; }
+
+/* Who reaches this? */
+.flow-impact { padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; background: var(--tier-guess-bg); border-color: var(--tier-guess); }
+.flow-impact .flow-chips { flex: 0 1 auto; }
+.flow-path { flex: 4 1 420px; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 12.5px var(--dna-mono); }
+.flow-path li { padding: 3px 8px; border-radius: 6px; background: var(--dna-chip); }
+.flow-path li:not(:last-child)::after { content: ' →'; color: var(--dna-muted); }
+.flow-path li.is-end { background: var(--dna-ink); color: var(--dna-on-ink); }
+
+@media (max-width: 760px) {
+  :root .explorer .explorer-header.flow-header { padding: 10px 16px; }
+  .flow-header__tools { margin-left: 0; flex-wrap: wrap; }
+  .flow-page { padding: 20px 16px 56px; }
+  .flow-notice { width: calc(100% - 32px); }
+  .flow-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow-page-row { grid-template-columns: 1fr; gap: 4px; }
+  .flow-code { position: static; }
+  .flow-step__body { margin-left: 0; }
+}

@@ -1,4 +1,4 @@
-import type { RepositorySnapshot, SourceFile } from '@codedna/shared';
+import type { RepositorySnapshot, RepositoryText, SourceFile } from '@codedna/shared';
 
 export interface AnalysisOptions {
   maxFiles?: number;
@@ -13,6 +13,8 @@ export class SnapshotValidationError extends Error {
 }
 const supported =
   /(?:\.(?:ts|tsx|js|jsx)|(?:^|\/)(?:tsconfig|jsconfig)\.json)$/;
+const documentPath = /(?:^|\/)readme(?:\.[\w.-]+)?\.md$|(?:^|\/)docs\/(?:[^/]+\/)*[^/]+\.md$|^(?:apps|packages)\/[^/]+\/[^/]+\.md$/i;
+const manifestPath = /(?:^|\/)package\.json$/;
 export function normalizePath(path: string): string {
   if (
     !path ||
@@ -102,6 +104,34 @@ export function validateSnapshot(
       throw new SnapshotValidationError(`Content size limit exceeded: ${path}`);
     return { ...file, path };
   });
+  const normalizeTexts = (
+    value: RepositoryText[] | undefined,
+    kind: 'documents' | 'manifests',
+    pattern: RegExp,
+    maxCount: number,
+    maxBytes: number,
+  ): RepositoryText[] | undefined => {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value) || value.length > maxCount)
+      throw new SnapshotValidationError(`Invalid ${kind} count`);
+    let bytes = 0;
+    return value.map((item) => {
+      if (!item || typeof item.path !== 'string' || typeof item.content !== 'string')
+        throw new SnapshotValidationError(`Malformed ${kind} entry`);
+      const path = normalizePath(item.path);
+      if (!pattern.test(path) || paths.has(path))
+        throw new SnapshotValidationError(`Invalid or duplicate ${kind} path: ${path}`);
+      paths.add(path);
+      const size = byteLength(item.content);
+      bytes += size;
+      total += size;
+      if (size > maxFileBytes || bytes > maxBytes || total > maxTotalBytes)
+        throw new SnapshotValidationError(`Content size limit exceeded: ${path}`);
+      return { path, content: item.content };
+    }).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  };
+  const documents = normalizeTexts(input.documents, 'documents', documentPath, 100, 2 * 1024 * 1024);
+  const manifests = normalizeTexts(input.manifests, 'manifests', manifestPath, 50, 1024 * 1024);
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  return { ...input, files };
+  return { ...input, files, ...(documents ? { documents } : {}), ...(manifests ? { manifests } : {}) };
 }

@@ -19,6 +19,10 @@ describe('server analysis worker', () => {
     );
     expect(value.analysis.snapshotId).toBe('test');
     expect(value.uiFlow.graph.nodes[0]?.routePath).toBe('/');
+    expect(value.understanding.snapshotId).toBe('test');
+    expect(value.features.features.some((item) => item.kind === 'route')).toBe(true);
+    expect(value.actions.schemaVersion).toBe('1.0');
+    expect(value.actions.pages.length).toBeGreaterThan(0);
   });
   it('aborts promptly and does not return a stale result', async () => {
     const controller = new AbortController();

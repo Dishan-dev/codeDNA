@@ -108,6 +108,23 @@
 .dna-map .react-flow__edge-path {
   stroke: #687eaa;
   stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+  animation: dna-dependency-flow 1.4s linear infinite;
+}
+@keyframes dna-dependency-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.dna-map--large .react-flow__edge-path {
+  animation: none;
+  stroke-dasharray: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dna-map .react-flow__edge-path {
+    animation: none;
+    stroke-dasharray: none;
+  }
 }
 .dna-map .react-flow__arrowhead {
   fill: #8ca7d8;
@@ -500,4 +517,30 @@
   border: 0;
   background: transparent;
   font-size: 16px;
+}
+.dna-evidence-items {
+  max-height: 240px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+.dna-evidence-items > div {
+  border-top: 1px solid #31445f;
+  padding: 5px 0;
+}
+.dna-evidence-items p {
+  margin: 5px 0;
+  line-height: 1.5;
+}
+.dna-evidence-items button {
+  float: none;
+  font-size: 10px;
+  color: #b5d1ff;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  padding: 4px;
+}
+.dna-evidence-items small {
+  color: #9eb2ce;
 }

@@ -5,11 +5,27 @@
 } from '@codedna/shared';
 export const MAX_3D_NODES = 500;
 export const MAX_3D_EDGES = 2000;
+export const MAX_ANIMATED_3D_EDGES = 80;
+/** Avoid a continuous render loop for large graphs, hidden tabs, or reduced motion. */
+export function shouldAnimate3D(
+  edgeCount: number,
+  enabled: boolean,
+  reducedMotion: boolean,
+  pageVisible: boolean,
+): boolean {
+  return (
+    enabled &&
+    !reducedMotion &&
+    pageVisible &&
+    edgeCount > 0 &&
+    edgeCount <= MAX_ANIMATED_3D_EDGES
+  );
+}
 export type SceneNode = {
   id: string;
   label: string;
   position: [number, number, number];
-  kind: 'folder' | 'file' | 'external';
+  kind: 'folder' | 'module' | 'file' | 'external';
   count: number;
   source?: DependencyNode;
   folder: string;
@@ -86,7 +102,11 @@ export function buildSceneGraph(
             0.5 + Math.floor(j / 100) * 2,
             z + row * 1.7,
           ],
-          kind: file.kind === 'external' ? 'external' : 'file',
+          kind: file.id.startsWith('group:')
+            ? 'module'
+            : file.kind === 'external'
+              ? 'external'
+              : 'file',
           count: 1,
           source: file,
           folder,

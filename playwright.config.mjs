@@ -17,6 +17,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm --filter @codedna/web exec next dev -p 3100 -H 127.0.0.1',
+    env: { ...process.env, CODEDNA_E2E: '1' },
     url: 'http://127.0.0.1:3100',
     timeout: 120000,
     reuseExistingServer: false,
