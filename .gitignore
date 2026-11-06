@@ -9,3 +9,9 @@ coverage/
 .env.local
 .env.*.local
 .corepack/
+.next-dev/
+.next-verify/
+.next-e2e/
+apps/web/public/starters/
+test-results/
+playwright-report/

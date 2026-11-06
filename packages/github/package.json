@@ -6,7 +6,8 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -17,5 +18,13 @@
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@codedna/shared": "workspace:*",
+    "tar-stream": "3.1.7"
+  },
+  "devDependencies": {
+    "@codedna/core": "workspace:*",
+    "@types/tar-stream": "3.1.4"
   }
 }

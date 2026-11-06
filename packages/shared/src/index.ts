@@ -28,6 +28,14 @@ export interface RepositorySnapshot {
   id: StableId;
   files: SourceFile[];
   revision?: string;
+  /** Optional, bounded untrusted text acquired at the same revision (READMEs). */
+  documents?: RepositoryText[];
+  /** Optional, bounded untrusted text acquired at the same revision (package.json files). */
+  manifests?: RepositoryText[];
+}
+export interface RepositoryText {
+  path: string;
+  content: string;
 }
 export interface AnalysisDiagnostic {
   id: StableId;
@@ -76,3 +84,6 @@ export interface AnalysisResult {
   dependencyGraph: DependencyGraph;
   uiFlowGraph: UIFlowGraph;
 }
+
+export * from './analysis.js';
+export * from './learning.js';
