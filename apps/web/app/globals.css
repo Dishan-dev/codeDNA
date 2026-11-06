@@ -2,4 +2,282 @@
 @tailwind components;
 @tailwind utilities;
 
-body { margin: 0; }
+/*
+ * Theme tokens (RGB channels, so Tailwind can add opacity). Cool neutral canvas, crisp white
+ * surfaces, hairline borders, one strong accent. Meaning colours: accent = action/progress ·
+ * success = correct/mastered · warning = hint/likely · danger (dashed) = unknown part/bug.
+ * Colour is always paired with text or an icon. Contrast (WCAG AA): ink/bg ≈ 17:1,
+ * muted/bg ≈ 6:1, on-accent/accent ≈ 6.3:1, success/success-soft ≈ 5.5:1.
+ */
+:root {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+  --color-bg: 247 247 249;
+  --color-surface: 255 255 255;
+  --color-surface-2: 243 244 247;
+  --color-code: 250 250 252;
+  --color-ink: 17 19 24;
+  --color-muted: 91 97 110;
+  --color-line: 229 231 236;
+  --color-accent: 79 70 229;
+  --color-accent-soft: 239 238 255;
+  --color-on-accent: 255 255 255;
+  --color-success: 22 110 54;
+  --color-success-soft: 225 247 234;
+  --color-warning: 161 72 6;
+  --color-warning-soft: 254 243 214;
+  --color-danger: 185 28 28;
+  --color-danger-soft: 254 232 232;
+  /*
+   * Part colours: each part of an app gets one, so you always know where you are. Deep shades in
+   * light mode and soft ones in dark mode, so the same token works as text (≥ 4.5:1 on surface)
+   * and as a fill under on-accent text.
+   */
+  --hue-teal: 15 118 110;
+  --hue-sky: 3 105 161;
+  --hue-violet: 109 40 217;
+  --hue-amber: 180 83 9;
+  --hue-rose: 190 18 60;
+  --hue-emerald: 4 120 87;
+  --hue-slate: 71 85 105;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: 10 11 14;
+    --color-surface: 19 21 26;
+    --color-surface-2: 28 31 38;
+    --color-code: 14 16 20;
+    --color-ink: 237 239 243;
+    --color-muted: 158 165 178;
+    --color-line: 40 44 54;
+    --color-accent: 140 146 255;
+    --color-accent-soft: 33 34 66;
+    --color-on-accent: 10 11 14;
+    --color-success: 74 222 128;
+    --color-success-soft: 18 44 30;
+    --color-warning: 251 191 36;
+    --color-warning-soft: 50 38 12;
+    --color-danger: 248 113 113;
+    --color-danger-soft: 54 22 24;
+    --hue-teal: 45 212 191;
+    --hue-sky: 125 211 252;
+    --hue-violet: 196 181 253;
+    --hue-amber: 252 211 77;
+    --hue-rose: 253 164 175;
+    --hue-emerald: 110 231 183;
+    --hue-slate: 203 213 225;
+    color-scheme: dark;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: rgb(var(--color-bg));
+  color: rgb(var(--color-ink));
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes codedna-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-pop {
+  animation: codedna-pop 320ms ease-out both;
+}
+
+@keyframes codedna-burst {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--burst-x), var(--burst-y)) scale(1);
+    opacity: 0;
+  }
+}
+.codedna-burst {
+  animation: codedna-burst 650ms ease-out both;
+}
+
+/* The moving dashes on the journey map while a request or answer is on its way. */
+@keyframes codedna-flow {
+  to {
+    background-position: 16px 0;
+  }
+}
+.codedna-flow {
+  background-image: linear-gradient(90deg, rgb(var(--color-accent)) 0 50%, transparent 50% 100%);
+  background-size: 16px 4px;
+  animation: codedna-flow 0.7s linear infinite;
+}
+.codedna-flow-back {
+  animation-direction: reverse;
+}
+
+/* Flow strip: the stop the pulse has just reached bumps once (transform only, so contrast holds). */
+@keyframes codedna-hop-now {
+  0% {
+    transform: scale(0.94);
+  }
+  55% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.codedna-hop-now {
+  animation: codedna-hop-now 420ms ease-out both;
+}
+
+/* The lesson that's next on the strand breathes, with a soft ring (shadow only, so contrast holds). */
+@keyframes codedna-node-next {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--part, var(--color-accent)) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgb(var(--part, var(--color-accent)) / 0);
+  }
+}
+.codedna-node-next {
+  animation: codedna-node-next 2.2s ease-in-out infinite;
+}
+
+/* A sheet that rises from the bottom on phones (transform only). */
+@keyframes codedna-sheet-up {
+  from {
+    transform: translateY(24px);
+  }
+  to {
+    transform: none;
+  }
+}
+.codedna-sheet-up {
+  animation: codedna-sheet-up 240ms ease-out both;
+}
+
+/* A panel that slides in when its tab is picked (transform only). */
+@keyframes codedna-slide-in {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: none;
+  }
+}
+.codedna-slide-in {
+  animation: codedna-slide-in 260ms ease-out both;
+}
+
+/* Sequence diagram: the current arrow draws itself from start to end. */
+@keyframes codedna-seq-draw {
+  from {
+    stroke-dashoffset: var(--seq-length);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.codedna-seq-draw {
+  stroke-dashoffset: 0;
+  animation: codedna-seq-draw 0.7s ease-out both;
+}
+
+/* Landing page: a soft grid backdrop and gentle motion (transform/opacity only, so text contrast never dips). */
+.codedna-grid {
+  background-image: linear-gradient(rgb(var(--color-line) / 0.55) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-line) / 0.55) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+@keyframes codedna-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.codedna-float {
+  animation: codedna-float 6s ease-in-out infinite;
+}
+.codedna-float-late {
+  animation: codedna-float 7s ease-in-out 1.5s infinite;
+}
+.codedna-float-slow {
+  animation: codedna-float 9s ease-in-out infinite;
+}
+@keyframes codedna-grow {
+  from {
+    transform: scaleX(0.1);
+  }
+  to {
+    transform: scaleX(0.6);
+  }
+}
+.codedna-grow {
+  transform-origin: left;
+  animation: codedna-grow 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s both;
+}
+@keyframes codedna-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--color-accent) / 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(var(--color-accent) / 0);
+  }
+}
+.codedna-ring {
+  animation: codedna-ring 1.8s ease-out infinite;
+}
+@keyframes codedna-ping {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.codedna-ping {
+  animation: codedna-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes codedna-rise {
+  from {
+    transform: translateY(14px);
+  }
+  to {
+    transform: none;
+  }
+}
+.codedna-rise {
+  animation: codedna-rise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
