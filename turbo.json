@@ -4,6 +4,9 @@
     "dev": {
       "cache": false,
       "persistent": true,
+      "passThroughEnv": [
+        "PORT"
+      ],
       "dependsOn": [
         "^build"
       ]

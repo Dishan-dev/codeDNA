@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import type { Challenge, Lesson, RepoBundle } from '@codedna/shared';
+import { buildJourneys, type Challenge, type Lesson, type RepoBundle } from '@codedna/shared';
 
 const bundle = (): RepoBundle => JSON.parse(readFileSync(join(__dirname, '..', 'public', 'starters', 'snackshop.json'), 'utf8')) as RepoBundle;
 const lessonTitled = (title: string): Lesson => Object.values(bundle().plan.lessons).find((lesson) => lesson.title === title)!;
@@ -232,6 +232,9 @@ for (const [name, path] of [
   ['Skills', '/r/snackshop/skills'],
   ['Requirements', '/r/snackshop/requirements'],
   ['Quality', '/r/snackshop/quality'],
+  ['Overview', '/r/snackshop/overview'],
+  ['QA flows', '/r/snackshop/qa'],
+  ['Projects', '/projects'],
 ] as const) {
   test(`accessibility: ${name} has no serious or critical axe violations`, async ({ page }) => {
     await page.goto(path);
@@ -368,9 +371,17 @@ test('the story plays as a journey, a sequence diagram or a flowchart, all in st
 test('Requirements: a brief is matched to the code, with coverage and evidence', async ({ page }) => {
   await page.goto('/r/snackshop/requirements');
   await expect(page.getByRole('heading', { level: 1, name: 'Requirements' })).toBeVisible();
-  // A PDF is turned away with a way forward, not silently ignored.
-  await page.getByLabel('Requirements file').setInputFiles({ name: 'brief.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
-  await expect(page.getByRole('alert').filter({ hasText: 'PDF and Word files aren’t read yet' })).toBeVisible();
+  // A broken file is turned away with a reason, not silently ignored.
+  await page.getByLabel('Requirements file').setInputFiles({ name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+  await expect(page.getByRole('alert').filter({ hasText: 'couldn’t be read' })).toBeVisible();
+  // A real PDF and a Word file are read in the browser.
+  for (const file of ['brief.pdf', 'brief.docx']) {
+    await page.getByLabel('Requirements file').setInputFiles(join(__dirname, 'fixtures', file));
+    await expect(page.getByRole('img', { name: /Requirements covered: \d+%/ })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: 'place an order' }).getByText('Built', { exact: true })).toBeVisible();
+    await expect(page.getByText(file)).toBeVisible();
+    await page.getByRole('button', { name: 'Use another document' }).click();
+  }
   await page.getByLabel('Or paste the requirements').fill('FR-1 The customer shall be able to place an order.\nFR-2 Users shall reset their password by email.');
   await page.getByRole('button', { name: 'Check coverage' }).click();
   await expect(page.getByRole('img', { name: /Requirements covered: \d+%/ })).toBeVisible();
@@ -421,4 +432,371 @@ test('the sidebar folds to icons and remembers it; on phones it is a drawer', as
   await expect(page.getByRole('heading', { level: 1, name: 'App map' })).toBeVisible();
   // Moving to another page closes the drawer.
   await expect(nav.getByRole('link', { name: 'Learn' })).toBeHidden();
+});
+
+test('Overview says where a project stands and what to do next; Projects lists it', async ({ page }) => {
+  await page.goto('/r/snackshop/overview');
+  await expect(page.getByRole('heading', { level: 1, name: 'Snackshop' })).toBeVisible();
+  const next = page.getByRole('region', { name: 'What to do next' });
+  await expect(next.getByRole('link', { name: /Run the QA agent/ })).toBeVisible();
+  await next.getByRole('link', { name: /Check it against the requirements/ }).click();
+  await page.getByRole('button', { name: 'Try the sample brief' }).click();
+  await expect(page.getByRole('img', { name: /Requirements covered: \d+%/ })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Repository' }).getByRole('link', { name: 'Overview' }).click();
+  await expect(page.getByRole('region', { name: 'What to do next' }).getByRole('link', { name: /Requirements are \d+% covered/ })).toBeVisible();
+
+  await page.goto('/projects');
+  await expect(page.getByRole('heading', { level: 1, name: 'Projects' })).toBeVisible();
+  const card = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Snackshop' }) });
+  await expect(card.getByText(/\d+%/).first()).toBeVisible();
+  await card.getByRole('button', { name: 'Remove Snackshop from this list' }).click();
+  await expect(page.getByRole('heading', { name: 'No projects yet' })).toBeVisible();
+});
+
+test('Quality shows a QA report loaded from a file, tied to each flow', async ({ page }) => {
+  const placeOrder = bundle().features.find((feature) => feature.title === 'Place order')!;
+  const report = {
+    version: 1,
+    repoId: 'snackshop',
+    repoName: 'Snackshop',
+    appUrl: 'http://localhost:3000',
+    createdAt: '2026-11-07T10:00:00Z',
+    tool: { name: 'codedna', version: '0.0.0' },
+    suites: [
+      { runner: 'tests', title: 'Your tests', status: 'passed', startedAt: '2026-11-07T10:00:00Z', durationMs: 900, checks: [{ id: 'tests:run', title: 'All 12 tests passed', status: 'passed', detail: '12 passed, 0 failed.' }] },
+      {
+        runner: 'walk',
+        title: 'Walk the app',
+        status: 'failed',
+        startedAt: '2026-11-07T10:00:01Z',
+        durationMs: 4000,
+        checks: [{ id: 'walk:x:try', title: 'Send “Place order” with empty fields', status: 'failed', featureId: placeOrder.id, page: '/checkout', detail: 'The server answered with an error.', evidence: ['500 POST http://localhost:3000/checkout'] }],
+      },
+    ],
+  };
+  await page.goto('/r/snackshop/quality');
+  await page.getByRole('tab', { name: /Test runs/ }).click();
+  await expect(page.getByRole('heading', { name: 'No test runs yet' })).toBeVisible();
+  // A report for another project is turned away.
+  await page.getByLabel('QA report file').setInputFiles({ name: 'qa-report.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...report, repoId: 'other', repoName: 'Other' })) });
+  await expect(page.getByRole('alert').filter({ hasText: 'This report is for “Other”' })).toBeVisible();
+  await page.getByLabel('QA report file').setInputFiles({ name: 'qa-report.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(report)) });
+  const failed = page.getByRole('listitem').filter({ hasText: 'Send “Place order” with empty fields' });
+  await expect(failed.getByText('Failed', { exact: true })).toBeVisible();
+  await expect(failed.getByRole('link', { name: 'See “Place order” →' })).toBeVisible();
+  await failed.getByText('What CodeDNA saw').click();
+  await expect(failed.getByText('500 POST http://localhost:3000/checkout')).toBeVisible();
+  // It is kept in this browser, and the Overview asks to fix what failed.
+  await page.reload();
+  await page.getByRole('tab', { name: /Test runs · 2/ }).click();
+  await expect(page.getByRole('region', { name: 'Walk the app' })).toBeVisible();
+  await page.goto('/r/snackshop/overview');
+  await expect(page.getByRole('link', { name: /Fix 1 failed check/ })).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical').map((violation) => violation.id)).toEqual([]);
+});
+
+test('QA flows lists every feature by part and shows which step of a case broke', async ({ page }) => {
+  const placeOrder = bundle().features.find((feature) => feature.title === 'Place order')!;
+  const request = placeOrder.steps.find((step) => step.stage === 'request')!;
+  const result = [...placeOrder.steps].reverse().find((step) => step.stage === 'screen' || step.stage === 'response')!;
+  const report = {
+    version: 1,
+    repoId: 'snackshop',
+    repoName: 'Snackshop',
+    appUrl: 'http://localhost:3000',
+    runId: 'run-20261107-100000',
+    createdAt: '2026-11-07T10:00:00Z',
+    tool: { name: 'codedna', version: '0.0.0' },
+    suites: [
+      {
+        runner: 'flows',
+        title: 'Flows',
+        status: 'failed',
+        startedAt: '2026-11-07T10:00:00Z',
+        durationMs: 9000,
+        checks: [
+          {
+            id: `flow:${placeOrder.id}:empty`,
+            title: 'Place order — Sent empty',
+            status: 'failed',
+            caseKind: 'empty',
+            featureId: placeOrder.id,
+            page: '/checkout',
+            detail: 'It accepted empty data: the server said OK and no message was shown.',
+            inputs: { 'Coupon code': '' },
+            screenshot: 'run-20261107-100000/place-order-empty.jpg',
+            steps: [
+              { kind: 'open', label: 'Open /checkout', status: 'passed' },
+              { kind: 'find', label: 'Find “Place order”', status: 'passed' },
+              { kind: 'fill', label: 'Fill in 1 of 1 field', status: 'passed' },
+              { kind: 'press', label: 'Press “Place order”', status: 'passed' },
+              { kind: 'request', label: 'Send to the server', status: 'warning', detail: 'POST /checkout', featureStepId: request.id },
+              { kind: 'server', label: 'Server answers', status: 'passed', detail: 'Answered 200.' },
+              { kind: 'result', label: 'What happens next', status: 'failed', detail: 'It accepted empty data.', featureStepId: result.id },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  await page.goto('/r/snackshop/quality');
+  await page.getByRole('tab', { name: /Test runs/ }).click();
+  await page.getByLabel('QA report file').setInputFiles({ name: 'qa-report.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(report)) });
+  await page.getByRole('navigation', { name: 'Repository' }).getByRole('link', { name: /QA flows/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'QA flows' })).toBeVisible();
+  await page.getByRole('group', { name: 'What to test' }).getByRole('button', { name: /Single features/ }).click();
+
+  // Every feature, grouped by part; the broken one opens first.
+  const list = page.getByRole('navigation', { name: 'Features to test' });
+  await expect(list.getByRole('heading', { name: 'Checkout' })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Place order.*Broke/ })).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByRole('tab', { name: /^Sent empty\s*:\s*Broke$/ })).toHaveAttribute('aria-selected', 'true');
+
+  // The strip and the step list say exactly which step broke, and where that is in the code.
+  const strip = page.getByRole('region', { name: 'Steps of this case' });
+  await expect(strip.getByRole('listitem').filter({ hasText: 'What happens next' })).toContainText('Broke');
+  await expect(strip.getByRole('listitem').filter({ hasText: 'Open /checkout' })).toContainText('Passed');
+  const broken = page.getByRole('list', { name: 'Step by step' }).getByRole('listitem').filter({ hasText: 'What happens next' });
+  await expect(broken.getByText(`${result.code.path}:${result.code.highlightLine}`)).toBeVisible();
+  await expect(broken.getByRole('link', { name: 'See this step →' })).toBeVisible();
+  await expect(page.getByRole('term').filter({ hasText: 'Coupon code' })).toBeVisible();
+  // Screenshots live in the project folder; from a loaded file the page says where.
+  await expect(page.getByText(/saved as .codedna\/qa\/run-20261107-100000\/place-order-empty.jpg/)).toBeVisible();
+
+  // A case that hasn't run shows the steps it will take.
+  await page.getByRole('tab', { name: /Very long text/ }).click();
+  await expect(strip.getByRole('listitem').filter({ hasText: 'Server answers' })).toContainText('Not tested');
+
+  // On the hosted site the page says how to test a deployed site, with its address filled in.
+  await expect(page.getByRole('group', { name: 'Where to test' }).getByRole('button', { name: 'A deployed site' })).toHaveAttribute('aria-pressed', 'true');
+  const address = page.getByLabel('Your app’s address');
+  await address.fill('https://snackshop.example');
+  await expect(page.getByText('codedna qa path/to/app --url https://snackshop.example --only journeys,flows', { exact: true })).toBeVisible();
+  // A full test needs the site's agreement first.
+  await page.getByText('Full test', { exact: true }).click();
+  await expect(page.getByText('codedna qa path/to/app --url https://snackshop.example --only journeys,flows --interact', { exact: true })).toBeVisible();
+  await expect(page.getByText('codedna: allow-testing', { exact: true })).toBeVisible();
+  await address.fill('http://snackshop.example');
+  await expect(page.getByText('A site on the internet must use https.')).toBeVisible();
+  await address.fill('https://snackshop.example');
+  // Or every deploy, through GitHub Actions.
+  await page.getByRole('button', { name: 'Every deploy' }).click();
+  await expect(page.getByText('codedna ci', { exact: true })).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical').map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([]);
+});
+
+test('on the hosted site, Test all flows runs the repo’s workflow on GitHub and shows the results', async ({ page }) => {
+  // An imported GitHub repo, with GitHub's API played by the test.
+  const repo = { ...bundle(), id: 'gh-acme-shop', name: 'acme/shop', source: 'github' } as RepoBundle;
+  const placeOrder = repo.features.find((feature) => feature.title === 'Place order')!;
+  await page.route('**/api/github/bundle/gh-acme-shop', (route) => route.fulfill({ json: repo }));
+  let workflowAdded = false;
+  let dispatched: { ref: string; inputs: Record<string, string> } | undefined;
+  let polls = 0;
+  await page.route('https://api.github.com/**', async (route) => {
+    const url = new URL(route.request().url());
+    expect(route.request().headers().authorization).toBe('Bearer github_pat_testtokenabcdefghijklmnop');
+    if (url.pathname === '/repos/acme/shop') return route.fulfill({ json: { default_branch: 'main' } });
+    if (url.pathname.endsWith('/workflows/codedna-qa.yml')) return workflowAdded ? route.fulfill({ json: { state: 'active' } }) : route.fulfill({ status: 404, json: { message: 'Not Found' } });
+    if (url.pathname.endsWith('/dispatches')) {
+      dispatched = route.request().postDataJSON() as typeof dispatched;
+      return route.fulfill({ status: 204, body: '' });
+    }
+    const run = { id: 5, display_title: `CodeDNA QA ${dispatched?.inputs.request ?? ''}`, created_at: new Date().toISOString(), html_url: 'https://github.com/acme/shop/actions/runs/5' };
+    if (url.pathname.endsWith('/workflows/codedna-qa.yml/runs')) return route.fulfill({ json: { workflow_runs: [{ ...run, status: 'queued' }] } });
+    if (url.pathname === '/repos/acme/shop/actions/runs/5') {
+      polls += 1;
+      return route.fulfill({ json: polls < 2 ? { ...run, status: 'in_progress' } : { ...run, status: 'completed', conclusion: 'failure' } });
+    }
+    return route.fulfill({ status: 404, json: {} });
+  });
+  const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  await page.route('**/api/github/qa-results', (route) => {
+    expect(route.request().headers()['x-github-token']).toBe('github_pat_testtokenabcdefghijklmnop');
+    expect(route.request().postDataJSON()).toEqual({ repo: 'acme/shop', runId: 5 });
+    return route.fulfill({
+      json: {
+        report: {
+          version: 1,
+          repoId: 'gh-acme-shop',
+          repoName: 'acme/shop',
+          appUrl: 'https://shop.example.com',
+          mode: 'look',
+          runId: 'run-1',
+          createdAt: '2026-11-08T10:00:00Z',
+          tool: { name: 'codedna', version: '0.0.0' },
+          suites: [
+            {
+              runner: 'flows',
+              title: 'Flows',
+              status: 'failed',
+              startedAt: '2026-11-08T10:00:00Z',
+              durationMs: 4000,
+              checks: [
+                {
+                  id: `flow:${placeOrder.id}:reach`,
+                  title: 'Place order — It can be reached',
+                  status: 'failed',
+                  caseKind: 'reach',
+                  featureId: placeOrder.id,
+                  page: '/checkout',
+                  detail: 'The page answered 500.',
+                  screenshot: 'run-1/place-order-reach.png',
+                  steps: [{ kind: 'open', label: 'Open /checkout', status: 'failed', detail: 'Answered 500.' }],
+                },
+              ],
+            },
+          ],
+        },
+        shots: { 'run-1/place-order-reach.png': pixel },
+      },
+    });
+  });
+
+  await page.goto('/r/gh-acme-shop/qa');
+  await page.getByRole('group', { name: 'What to test' }).getByRole('button', { name: /Single features/ }).click();
+  await page.getByLabel('Your app’s address').fill('https://shop.example.com');
+  const run = page.getByRole('button', { name: 'Test all flows' });
+  await expect(run).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'Make a fine-grained token ↗' })).toHaveAttribute('href', /personal-access-tokens\/new\?.*target_name=acme/);
+
+  // Connect: the repo has no workflow yet, so the page says how to add it.
+  await page.getByLabel('GitHub token').fill('github_pat_testtokenabcdefghijklmnop');
+  await page.getByRole('button', { name: 'Connect' }).click();
+  await expect(page.getByText('acme/shop doesn’t have the CodeDNA QA workflow yet')).toBeVisible();
+  workflowAdded = true;
+  await page.getByRole('button', { name: 'Check again' }).click();
+
+  // Then one press runs it on GitHub and the results land on the page.
+  await expect(run).toBeEnabled();
+  await run.click();
+  await expect(page.getByRole('link', { name: 'Open the run on GitHub ↗' })).toHaveAttribute('href', 'https://github.com/acme/shop/actions/runs/5');
+  await expect(page.getByText(/^Finished: 1 broke, 0 to look at, 0 passed/)).toBeVisible({ timeout: 30_000 });
+  expect(dispatched).toMatchObject({ ref: 'main', inputs: { url: 'https://shop.example.com', interact: 'false' } });
+  expect(dispatched!.inputs.request).toMatch(/^#\w+$/);
+  const list = page.getByRole('navigation', { name: 'Features to test' });
+  await list.getByRole('button', { name: /Place order.*Broke/ }).click();
+  await expect(page.getByRole('img', { name: /The page after “It can be reached” on Place order/ })).toHaveAttribute('src', pixel);
+
+  // Disconnecting forgets the token.
+  await page.getByRole('button', { name: 'Disconnect GitHub' }).click();
+  await expect(page.getByLabel('GitHub token')).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical').map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([]);
+});
+
+test('Connect GitHub signs in through the CodeDNA GitHub App with one click', async ({ page }) => {
+  const repo = { ...bundle(), id: 'gh-acme-shop', name: 'acme/shop', source: 'github' } as RepoBundle;
+  await page.route('**/api/github/bundle/gh-acme-shop', (route) => route.fulfill({ json: repo }));
+  await page.route('**/api/github/auth/config', (route) => route.fulfill({ json: { enabled: true, installUrl: 'https://github.com/apps/codedna-qa/installations/new' } }));
+  // GitHub's approve page is skipped: the sign-in comes straight back with a token.
+  await page.route('**/api/github/auth/start?*', (route) => {
+    expect(new URL(route.request().url()).searchParams.get('return')).toBe('/r/gh-acme-shop/qa');
+    return route.fulfill({ status: 302, headers: { Location: '/r/gh-acme-shop/qa#codedna-github=ghu_apptokenabcdefghijklmnop&expires=28800' } });
+  });
+  let installed = false;
+  await page.route('https://api.github.com/**', (route) => {
+    expect(route.request().headers().authorization).toBe('Bearer ghu_apptokenabcdefghijklmnop');
+    const path = new URL(route.request().url()).pathname;
+    if (!installed) return route.fulfill({ status: 404, json: { message: 'Not Found' } });
+    if (path === '/repos/acme/shop') return route.fulfill({ json: { default_branch: 'main' } });
+    return route.fulfill({ json: { state: 'active' } });
+  });
+
+  await page.goto('/r/gh-acme-shop/qa');
+  await page.getByRole('group', { name: 'What to test' }).getByRole('button', { name: /Single features/ }).click();
+  await page.getByLabel('Your app’s address').fill('https://shop.example.com');
+  await expect(page.getByLabel('GitHub token')).toBeHidden();
+  await page.getByRole('button', { name: 'Connect GitHub' }).click();
+
+  // Back on the page, the token is out of the address; the app isn't on the repo yet.
+  await expect(page.getByText(/CodeDNA can’t see acme\/shop yet/)).toBeVisible();
+  expect(page.url()).not.toContain('codedna-github');
+  await expect(page.getByRole('link', { name: 'Install the CodeDNA app on acme/shop ↗' })).toHaveAttribute('href', 'https://github.com/apps/codedna-qa/installations/new');
+  installed = true;
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(page.getByRole('button', { name: 'Test all flows' })).toBeEnabled();
+
+  // Still connected after a reload; Disconnect forgets it.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Test all flows' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Disconnect GitHub' }).click();
+  await expect(page.getByRole('button', { name: 'Connect GitHub' })).toBeVisible();
+});
+
+test('user journeys are drawn as a map, with the point that broke and its HTTP answer, and can be edited', async ({ page }) => {
+  const journey = buildJourneys(bundle().features).find((item) => item.title === 'Place order')!;
+  const report = {
+    version: 1,
+    repoId: 'snackshop',
+    repoName: 'Snackshop',
+    appUrl: 'http://localhost:3000',
+    mode: 'full',
+    runId: 'run-20261110-100000',
+    createdAt: '2026-11-10T10:00:00Z',
+    tool: { name: 'codedna', version: '0.0.0' },
+    suites: [
+      {
+        runner: 'journeys',
+        title: 'User journeys',
+        status: 'failed',
+        startedAt: '2026-11-10T10:00:00Z',
+        durationMs: 5000,
+        checks: [
+          {
+            id: `journey:${journey.id}`,
+            journeyId: journey.id,
+            title: 'Place order',
+            status: 'failed',
+            detail: 'Server answers: The server failed: it answered 500.',
+            steps: [
+              { nodeId: '0.open', kind: 'open', label: 'Open /', status: 'passed', http: { method: 'GET', url: 'http://localhost:3000/', status: 200, durationMs: 40 } },
+              { nodeId: '1.find', kind: 'find', label: 'Find “Go to checkout”', status: 'passed' },
+              { nodeId: '1.press', kind: 'press', label: 'Click “Go to checkout”', status: 'passed' },
+              { nodeId: '1.result', kind: 'result', label: 'Opens /checkout', status: 'passed' },
+              { nodeId: '2.find', kind: 'find', label: 'Find “Place order”', status: 'passed' },
+              { nodeId: '2.fill', kind: 'fill', label: 'Fill in the form', status: 'passed' },
+              { nodeId: '2.press', kind: 'press', label: 'Press “Place order”', status: 'passed' },
+              { nodeId: '2.request', kind: 'request', label: 'Send to the server', status: 'passed', http: { method: 'POST', url: 'http://localhost:3000/checkout', status: 500, durationMs: 120 } },
+              { nodeId: '2.server', kind: 'server', label: 'Server answers', status: 'failed', detail: 'The server failed: it answered 500.', http: { method: 'POST', url: 'http://localhost:3000/checkout', status: 500, durationMs: 120 } },
+              { nodeId: '2.result', kind: 'result', label: 'What happens next', status: 'skipped', detail: 'Not reached.' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  await page.goto('/r/snackshop/qa');
+  await expect(page.getByRole('group', { name: 'What to test' }).getByRole('button', { name: /User journeys/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel('QA report file').setInputFiles({ name: 'qa-report.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(report)) });
+
+  // The broken journey opens first, on the point that broke, with its request and answer.
+  const list = page.getByRole('navigation', { name: 'Journeys' });
+  await expect(list.getByRole('button', { name: /Place order.*Broke/ })).toHaveAttribute('aria-current', 'true');
+  const map = page.getByRole('region', { name: 'Journey map' });
+  await expect(map.getByRole('button', { name: /^Server answers: Broke, POST answered 500/ })).toHaveAttribute('aria-pressed', 'true');
+  const point = page.getByRole('region', { name: 'This point' });
+  await expect(point.getByText('POST http://localhost:3000/checkout')).toBeVisible();
+  await expect(point.getByText('The server failed: it answered 500.')).toBeVisible();
+  await expect(map.getByRole('button', { name: /^What happens next: Skipped/ })).toBeVisible();
+  // Picking another point shows it.
+  await map.getByRole('button', { name: /^Open \/: Passed/ }).click();
+  await expect(point.getByText('GET http://localhost:3000/')).toBeVisible();
+  // Signing in uses the repo's secrets on the hosted site.
+  await expect(page.getByText('CODEDNA_QA_EMAIL', { exact: true })).toBeVisible();
+
+  // Rename it; on the hosted site edits stay in this browser, with the file to add to the repo.
+  await page.getByRole('button', { name: 'Edit journey' }).click();
+  await page.getByLabel('Journey name').fill('Buy snacks');
+  await page.getByRole('button', { name: 'Move step 2 up' }).click();
+  await page.getByRole('button', { name: 'Move step 1 down' }).click();
+  await page.getByRole('button', { name: 'Save journey' }).click();
+  await expect(list.getByRole('button', { name: /Buy snacks\s*edited/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy codedna.journeys.json' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('navigation', { name: 'Journeys' }).getByRole('button', { name: /Buy snacks/ })).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical').map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([]);
 });

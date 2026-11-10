@@ -10,6 +10,9 @@ export const repoKey = (name: string) =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 60) || 'app';
 
+/** The id of a GitHub repository's lessons, e.g. gh-acme-shop. The CLI uses it too, so a CI report loads on that repo's page. */
+export const githubRepoId = (owner: string, repo: string) => `gh-${repoKey(`${owner}-${repo}`)}`.slice(0, 60).replace(/-+$/, '');
+
 /** Same hash as lesson ids, so a feature's story and its lesson share a slug. */
 export const featureSlug = (key: string) => `f-${hash(key)}`;
 

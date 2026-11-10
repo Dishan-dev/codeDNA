@@ -2,12 +2,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Icon, pathStates, type IconName } from '@codedna/learn-ui';
+import { Icon, type IconName } from '@codedna/learn-ui';
 import type { ConceptId, LearnerEvent, Progress, RepoBundle } from '@codedna/shared';
 import { useBundle } from '@/lib/bundle';
 import { useProgress } from '@/lib/progress-store';
-import { scanQuality } from '@/lib/quality';
-import { matchRequirements, parseRequirements } from '@/lib/requirements';
+import { projectStore, useProjectStatus, type ProjectStatus } from '@/lib/projects';
+import { flowCounts, flowViews } from '@/lib/qa-flows';
+import type { QaReportState } from '@/lib/qa-results';
 import { cn } from '@/lib/utils';
 import { ConceptDrawer } from './concept-drawer';
 import { Brand, ButtonLink, Logo, PageMessage, focus } from './ui';
@@ -21,6 +22,9 @@ interface RepoContextValue {
   base: string;
   /** Open the Concept Card drawer (and count the concept as seen). */
   openConcept: (id: ConceptId) => void;
+  /** Where the project stands: lessons, requirements coverage, risks, last QA run. */
+  status: ProjectStatus;
+  qa: QaReportState;
 }
 const RepoContext = createContext<RepoContextValue | undefined>(undefined);
 
@@ -52,26 +56,20 @@ interface NavItem {
  * against what was asked), live counts on each, and your progress at the foot. It folds down to
  * icons on large screens and slides in as a drawer on phones. One nav for every size.
  */
-function Sidebar({ bundle, base, progress, collapsed, onCollapse, open, onClose }: { bundle: RepoBundle; base: string; progress: Progress; collapsed: boolean; onCollapse: () => void; open: boolean; onClose: () => void }) {
+function Sidebar({ bundle, base, progress, status, flowsBroken, collapsed, onCollapse, open, onClose }: { bundle: RepoBundle; base: string; progress: Progress; status: ProjectStatus; flowsBroken: number; collapsed: boolean; onCollapse: () => void; open: boolean; onClose: () => void }) {
   const pathname = usePathname();
-  const items = pathStates(bundle.plan, progress);
-  const done = items.filter((item) => item.state === 'done').length;
-  const quality = useMemo(() => scanQuality(bundle), [bundle]);
-  const risky = quality.counts.high + quality.counts.medium;
-  // The coverage of a saved requirements document, refreshed when the page changes.
-  const [coverage, setCoverage] = useState<number | undefined>();
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(`codedna:srs:${bundle.id}`);
-      setCoverage(saved ? matchRequirements(parseRequirements((JSON.parse(saved) as { text: string }).text), bundle.features).percent : undefined);
-    } catch {
-      setCoverage(undefined);
-    }
-  }, [bundle, pathname]);
+  const done = status.lessons.done;
+  const coverage = status.coverage;
+  const failed = status.qa ? status.qa.failed : 0;
+  const risky = status.risks + failed;
   // A page change on a phone closes the drawer.
   useEffect(() => onClose(), [pathname, onClose]);
 
   const groups: { title: string; items: NavItem[] }[] = [
+    {
+      title: 'Project',
+      items: [{ href: `${base}/overview`, label: 'Overview', icon: 'client', active: pathname.startsWith(`${base}/overview`) }],
+    },
     {
       title: 'Understand',
       items: [
@@ -85,6 +83,7 @@ function Sidebar({ bundle, base, progress, collapsed, onCollapse, open, onClose 
       title: 'Deliver',
       items: [
         { href: `${base}/requirements`, label: 'Requirements', icon: 'form', active: pathname.startsWith(`${base}/requirements`), badge: coverage === undefined ? undefined : `${coverage}%`, badgeTone: 'accent' },
+        { href: `${base}/qa`, label: 'QA flows', icon: 'play', active: pathname.startsWith(`${base}/qa`), badge: flowsBroken ? String(flowsBroken) : undefined, badgeTone: 'warning' },
         { href: `${base}/quality`, label: 'Quality', icon: 'check', active: pathname.startsWith(`${base}/quality`), badge: risky ? String(risky) : undefined, badgeTone: 'warning' },
       ],
     },
@@ -214,7 +213,11 @@ function Sidebar({ bundle, base, progress, collapsed, onCollapse, open, onClose 
               </span>
             </div>
           </div>
-          <Link href="/#start" title={!wide ? 'Learn another repo' : undefined} className={cn('mt-2 flex h-9 items-center gap-2 rounded-xl px-3 text-[13px] font-medium text-muted hover:bg-surface-2 hover:text-ink', !wide && 'lg:justify-center lg:px-0', focus)}>
+          <Link href="/projects" title={!wide ? 'All projects' : undefined} className={cn('mt-2 flex h-9 items-center gap-2 rounded-xl px-3 text-[13px] font-medium text-muted hover:bg-surface-2 hover:text-ink', !wide && 'lg:justify-center lg:px-0', focus)}>
+            <Icon name="book" className="h-4 w-4 shrink-0" />
+            <span className={cn(!wide && 'lg:sr-only')}>All projects</span>
+          </Link>
+          <Link href="/#start" title={!wide ? 'Learn another repo' : undefined} className={cn('flex h-9 items-center gap-2 rounded-xl px-3 text-[13px] font-medium text-muted hover:bg-surface-2 hover:text-ink', !wide && 'lg:justify-center lg:px-0', focus)}>
             <Icon name="github" className="h-4 w-4 shrink-0" />
             <span className={cn(!wide && 'lg:sr-only')}>Learn another repo</span>
           </Link>
@@ -242,6 +245,16 @@ function MobileBar({ name, onMenu }: { name: string; onMenu: () => void }) {
 function ShellWithBundle({ bundle, children }: { bundle: RepoBundle; children: ReactNode }) {
   const { progress, loaded, dispatch } = useProgress(bundle.id, bundle.plan);
   const base = `/r/${bundle.id}`;
+  const pathname = usePathname();
+  const { qaState: qa, ...status } = useProjectStatus(bundle, progress, pathname);
+  const flowsBroken = useMemo(() => flowCounts(flowViews(bundle.features, qa.report).values()).failed, [bundle.features, qa.report]);
+  // Remember this project and where it stands, for the Projects list. `record` stands for status
+  // and loaded, so it saves when they change, not on every render.
+  const record = JSON.stringify({ status, loaded });
+  useEffect(() => {
+    if (!loaded) return;
+    projectStore.save({ id: bundle.id, name: bundle.name, source: bundle.source, framework: bundle.framework.label, lastOpened: new Date().toISOString(), ...status });
+  }, [bundle, record]);
   const [concept, setConcept] = useState<ConceptId | undefined>();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -270,8 +283,8 @@ function ShellWithBundle({ bundle, children }: { bundle: RepoBundle; children: R
     [dispatch],
   );
   return (
-    <RepoContext.Provider value={{ bundle, progress, progressLoaded: loaded, dispatch, base, openConcept }}>
-      <Sidebar bundle={bundle} base={base} progress={progress} collapsed={collapsed} onCollapse={collapse} open={drawer} onClose={closeDrawer} />
+    <RepoContext.Provider value={{ bundle, progress, progressLoaded: loaded, dispatch, base, openConcept, status, qa }}>
+      <Sidebar bundle={bundle} base={base} progress={progress} status={status} flowsBroken={flowsBroken} collapsed={collapsed} onCollapse={collapse} open={drawer} onClose={closeDrawer} />
       <MobileBar name={bundle.name} onMenu={() => setDrawer(true)} />
       <main id="main" className={cn('min-h-screen pb-24 transition-[padding] duration-300 lg:pb-12', collapsed ? 'lg:pl-[76px]' : 'lg:pl-[264px]')}>
         <div className="mx-auto max-w-[1720px] px-4 pt-6 sm:px-6 lg:px-10 lg:pt-10">{children}</div>

@@ -18,4 +18,4 @@ export { detectFramework, manifestDependencies } from './framework.js';
 export { findDuplicates } from './features/duplicates.js';
 export { buildLearningPlan, buildLesson, findHiddenLessons, lessonFeatures, lessonIdFor, orderLessons } from './learn/index.js';
 export { CONCEPTS, CONCEPT_ORDER } from './learn/concepts.js';
-export { buildRepoBundle, featureSlug, repoKey } from './learn/bundle.js';
+export { buildRepoBundle, featureSlug, githubRepoId, repoKey } from './learn/bundle.js';

@@ -87,3 +87,8 @@ export interface AnalysisResult {
 
 export * from './analysis.js';
 export * from './learning.js';
+export * from './qa.js';
+export * from './qa-plan.js';
+export * from './qa-target.js';
+export * from './qa-ci.js';
+export * from './qa-journey.js';

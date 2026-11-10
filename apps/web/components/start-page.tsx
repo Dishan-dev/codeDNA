@@ -331,6 +331,7 @@ export function StartPage() {
               ['How it works', '#how'],
               ['Features', '#features'],
               ['Starter repos', '#starters'],
+              ['My projects', '/projects'],
             ].map(([label, href]) => (
               <a key={href} href={href} className={cn('rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface hover:text-ink', focus)}>
                 {label}
