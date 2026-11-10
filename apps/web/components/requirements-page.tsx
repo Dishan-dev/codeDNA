@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Icon, type IconName } from '@codedna/learn-ui';
+import { ACCEPT, DocumentError, FORMATS_TEXT, readDocument } from '@/lib/documents';
 import { matchRequirements, parseRequirements, type CoverageStatus, type RequirementMatch } from '@/lib/requirements';
 import { cn } from '@/lib/utils';
 import { useRepo } from './repo-shell';
@@ -14,7 +15,8 @@ interface SavedDoc {
 }
 
 const KEY = (id: string) => `codedna:srs:${id}`;
-const MAX_BYTES = 1024 * 1024;
+/** Long enough for a large SRS, small enough for browser storage. */
+const MAX_TEXT = 400_000;
 
 export const STATUS_LOOK: Record<CoverageStatus, { label: string; icon: IconName; chip: string; bar: string }> = {
   built: {
@@ -87,25 +89,19 @@ function Intake({ onDoc }: { onDoc: (doc: SavedDoc) => void }) {
   const [text, setText] = useState('');
   const [over, setOver] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [reading, setReading] = useState<string | undefined>();
   const read = (file: File) => {
     setProblem(undefined);
-    if (!/\.(?:md|markdown|txt|text)$/i.test(file.name) && file.type !== 'text/plain' && file.type !== 'text/markdown') {
-      setProblem(/\.(?:pdf|docx?)$/i.test(file.name) ? 'PDF and Word files aren’t read yet. Copy the text out of the document and paste it below.' : 'Use a text or Markdown file (.txt, .md), or paste the text below.');
-      return;
-    }
-    if (file.size > MAX_BYTES) return setProblem('That file is over 1 MB. Paste the requirements part instead.');
-    file
-      .text()
-      .then((content) =>
-        parseRequirements(content).length
-          ? onDoc({
-              name: file.name,
-              text: content,
-              at: new Date().toISOString(),
-            })
-          : setProblem('No requirements found in that file. Numbered items, bullets or “shall / must” sentences work best.'),
-      )
-      .catch(() => setProblem('That file couldn’t be read.'));
+    setReading(file.name);
+    readDocument(file)
+      .then((content) => {
+        // Only the text is kept, and only what fits in browser storage.
+        const kept = content.slice(0, MAX_TEXT);
+        if (!parseRequirements(kept).length) return setProblem('No requirements found in that file. Numbered items, bullets or “shall / must” sentences work best.');
+        onDoc({ name: file.name, text: kept, at: new Date().toISOString() });
+      })
+      .catch((error: unknown) => setProblem(error instanceof DocumentError ? error.message : 'That file couldn’t be read.'))
+      .finally(() => setReading(undefined));
   };
   const drop = (event: DragEvent) => {
     event.preventDefault();
@@ -133,21 +129,31 @@ function Intake({ onDoc }: { onDoc: (doc: SavedDoc) => void }) {
             <Icon name="form" className="h-7 w-7" />
           </span>
           <p className="mt-4 text-[18px] font-semibold text-ink">Drop your SRS or client brief here</p>
-          <p className="mt-1 text-[14px] text-muted">Text or Markdown (.txt, .md), up to 1 MB. It stays in this browser.</p>
+          <p className="mt-1 text-[14px] text-muted">{FORMATS_TEXT}. It’s read in this browser and never uploaded.</p>
           <button
             type="button"
             onClick={() => input.current?.click()}
-            className={cn('mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[15px] font-semibold text-on-accent shadow-card hover:opacity-95', focus)}
+            disabled={!!reading}
+            className={cn('mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[15px] font-semibold text-on-accent shadow-card hover:opacity-95 disabled:cursor-wait disabled:opacity-70', focus)}
           >
-            Choose a file
+            {reading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-accent/40 border-t-on-accent" aria-hidden="true" /> : null}
+            {reading ? 'Reading…' : 'Choose a file'}
           </button>
+          {reading ? (
+            <p role="status" className="mt-3 text-[13px] text-muted">
+              Reading {reading}…
+            </p>
+          ) : null}
           <input
             ref={input}
             type="file"
-            accept=".txt,.md,.markdown,text/plain,text/markdown"
+            accept={ACCEPT}
             className="sr-only"
             aria-label="Requirements file"
-            onChange={(event) => event.target.files?.[0] && read(event.target.files[0])}
+            onChange={(event) => {
+              if (event.target.files?.[0]) read(event.target.files[0]);
+              event.target.value = '';
+            }}
           />
         </div>
         <div className="mt-6">

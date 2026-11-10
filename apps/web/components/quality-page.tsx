@@ -6,6 +6,7 @@ import type { Feature } from '@codedna/shared';
 import { pageText } from '@/lib/flows';
 import { KIND_LABEL, SEVERITY_ORDER, scanQuality, type Severity } from '@/lib/quality';
 import { cn } from '@/lib/utils';
+import { QaResults, RunQaHelp } from './qa-results';
 import { useRepo } from './repo-shell';
 import { Card, PageHeader, focus } from './ui';
 
@@ -23,16 +24,17 @@ const SEVERITY: Record<Severity, { label: string; chip: string; dot: string }> =
   low: { label: 'Low', chip: 'bg-surface-2 text-muted', dot: 'bg-muted' },
 };
 const TRIED_KEY = (id: string) => `codedna:qa-tried:${id}`;
-type Tab = 'findings' | 'edge';
+type Tab = 'findings' | 'edge' | 'runs';
 
 /**
  * Quality: a QA scan read from the code. Findings say where a flow is risky; edge cases say what
  * to try, made from the real conditions on each flow, and tick off as you test them.
  */
 export function QualityPage() {
-  const { bundle, base } = useRepo();
+  const { bundle, base, qa } = useRepo();
   const report = useMemo(() => scanQuality(bundle), [bundle]);
   const byId = useMemo(() => new Map<string, Feature>(bundle.features.map((feature) => [feature.id, feature])), [bundle.features]);
+  const runs = qa.report ? qa.report.suites.reduce((sum, suite) => sum + suite.checks.length, 0) : 0;
   const [tab, setTab] = useState<Tab>('findings');
   const [severity, setSeverity] = useState<Severity | 'all'>('all');
   const [tried, setTried] = useState<ReadonlySet<string>>(new Set());
@@ -64,7 +66,7 @@ export function QualityPage() {
   return (
     <>
       <PageHeader eyebrow={<span className="text-[12px] font-semibold uppercase tracking-wider text-accent">Deliver</span>} title="Quality">
-        A QA scan read from the code: where flows are risky, and the edge cases worth trying. Nothing is run yet; you test, and tick off what you’ve tried.
+        Where flows are risky and the edge cases worth trying, read from the code — and, when you run the QA agent on your computer, what your tests and a real browser found.
       </PageHeader>
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -106,6 +108,7 @@ export function QualityPage() {
               [
                 ['findings', `Findings · ${report.findings.length}`],
                 ['edge', `Edge cases · ${totalCases}`],
+                ['runs', qa.report ? `Test runs · ${runs}` : 'Test runs'],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -123,7 +126,9 @@ export function QualityPage() {
           </div>
 
           <div id="quality-panel" role="tabpanel" className="mt-4">
-            {tab === 'findings' ? (
+            {tab === 'runs' ? (
+              <QaResults qa={qa} />
+            ) : tab === 'findings' ? (
               findings.length ? (
                 <ul className="space-y-2.5">
                   {findings.map((finding) => {
@@ -213,22 +218,21 @@ export function QualityPage() {
               a place to look, not a proven bug.
             </p>
           </Card>
-          <Card className="p-5">
-            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
-              <Icon name="terminal" className="h-4 w-4 text-accent" /> Coming next: the QA agent
-            </h2>
-            <ol className="mt-3 space-y-2.5 text-[13px] leading-relaxed text-muted">
-              <li>
-                <strong className="text-ink">Run your tests</strong> through the CodeDNA app on your computer, only after you confirm, and show results on each flow.
-              </li>
-              <li>
-                <strong className="text-ink">Walk each flow in a real browser</strong>, trying these edge cases, and record what broke.
-              </li>
-              <li>
-                <strong className="text-ink">Write test files</strong> for flows that have none, for you to review and keep.
-              </li>
-            </ol>
-          </Card>
+          {tab === 'runs' && !qa.report ? null : (
+            <Card className="p-5">
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+                <Icon name="terminal" className="h-4 w-4 text-accent" /> The QA agent
+              </h2>
+              <div className="mt-3">
+                <RunQaHelp compact />
+              </div>
+              {qa.report ? (
+                <button type="button" onClick={() => setTab('runs')} className={cn('mt-3 text-[13px] font-medium text-accent hover:underline', focus)}>
+                  See the last run →
+                </button>
+              ) : null}
+            </Card>
+          )}
         </aside>
       </div>
     </>

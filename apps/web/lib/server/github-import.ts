@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildRepoBundle, repoKey } from '@codedna/core';
+import { buildRepoBundle, githubRepoId } from '@codedna/core';
 import { acquireRepository, AcquisitionError, parseRepositoryUrl, type AcquisitionResult, type RepositoryIdentity } from '@codedna/github';
 import { AnalysisWorkerError, runAnalysis } from '@codedna/node';
 import type { RepoAnalysis, RepoBundle, RepositorySnapshot } from '@codedna/shared';
@@ -159,7 +159,7 @@ export function createImporter(overrides: Partial<ImporterDeps> = {}) {
       onEvent({ stage: 'analysing', files: result.snapshot.files.length });
       const analysis = await deps.analyze(result.snapshot);
       if (!result.completeness.complete) analysis.limitations.push('This repo is bigger than CodeDNA downloads at once; some files were left out.');
-      const id = `gh-${repoKey(`${identity.owner}-${identity.repo}`)}`.slice(0, 60).replace(/-+$/, '');
+      const id = githubRepoId(identity.owner, identity.repo);
       const bundle = buildRepoBundle(id, analysis, 'github', `${identity.owner}/${identity.repo}`);
       if (result.otherLanguages?.length) bundle.otherLanguages = result.otherLanguages;
       await save(bundle);
