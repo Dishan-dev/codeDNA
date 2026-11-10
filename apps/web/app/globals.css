@@ -281,3 +281,70 @@ body {
 .codedna-rise {
   animation: codedna-rise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
+
+/* Developer mode: a turning strand of DNA. Each rung's two dots swap front and back. */
+.codedna-helix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 84px;
+}
+.codedna-helix-rung {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 84px;
+}
+.codedna-helix-line {
+  position: absolute;
+  width: 2px;
+  height: 52px;
+  border-radius: 2px;
+  background: rgb(var(--color-accent) / 0.25);
+  transform: scaleY(var(--rung));
+  animation: codedna-helix-rung 2.4s linear infinite;
+  animation-delay: var(--delay);
+}
+.codedna-helix-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  animation: codedna-helix-a 2.4s linear infinite;
+  animation-delay: var(--delay);
+}
+.codedna-helix-a {
+  background: rgb(var(--color-accent));
+  transform: translateY(var(--y)) scale(var(--depth));
+}
+.codedna-helix-b {
+  background: rgb(var(--hue-teal));
+  transform: translateY(calc(var(--y) * -1)) scale(calc(1.55 - var(--depth)));
+  animation-name: codedna-helix-b;
+}
+@keyframes codedna-helix-a {
+  0% { transform: translateY(0) scale(0.78); opacity: 0.85; }
+  25% { transform: translateY(26px) scale(0.55); opacity: 0.45; }
+  50% { transform: translateY(0) scale(0.78); opacity: 0.85; }
+  75% { transform: translateY(-26px) scale(1); opacity: 1; }
+  100% { transform: translateY(0) scale(0.78); opacity: 0.85; }
+}
+@keyframes codedna-helix-b {
+  0% { transform: translateY(0) scale(0.78); opacity: 0.85; }
+  25% { transform: translateY(-26px) scale(1); opacity: 1; }
+  50% { transform: translateY(0) scale(0.78); opacity: 0.85; }
+  75% { transform: translateY(26px) scale(0.55); opacity: 0.45; }
+  100% { transform: translateY(0) scale(0.78); opacity: 0.85; }
+}
+@keyframes codedna-helix-rung {
+  0%, 50%, 100% { transform: scaleY(0); }
+  25%, 75% { transform: scaleY(1); }
+}
+.codedna-build-bar {
+  animation: codedna-build 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes codedna-build {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(310%); }
+}

@@ -54,6 +54,12 @@ It is on with `pnpm dev` and with the CLI. On a public deployment it is **off** 
 | `GITHUB_TOKEN=<token>` | Optional. A read-only token raises GitHub's limit from 60 to 5,000 requests an hour. |
 | `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_SLUG` | Optional. Turns on **Connect GitHub** on the QA flows page. Register a GitHub App with the callback URL `https://<your-site>/api/github/auth/callback`, "Expire user authorization tokens" on, no webhook, and the repository permission **Actions: Read and write** only. |
 
+## Developer mode
+
+While CodeDNA is being built, the public site shows **only the landing page**. Any other page (a lesson, a repo, `/explore`) shows an animated “CodeDNA is being built” screen at the same address, and the API answers `503` with a short message (the GitHub form on the landing page shows it).
+
+It is on automatically for Vercel builds of the `main` branch, and off for `pnpm dev`, local builds and the CLI. `CODEDNA_DEVELOPER_MODE=on` or `off` decides it anywhere; set it to `off` in Vercel (and redeploy) to open the full app.
+
 ## Limitations
 
 What CodeDNA can learn from:
